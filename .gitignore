@@ -94,7 +94,6 @@ htmlcov/
 *.pth
 *.onnx
 *.bin
-models/
 
 # Data files (exclude from git)
 data/
