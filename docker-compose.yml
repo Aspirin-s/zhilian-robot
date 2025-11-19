@@ -78,6 +78,13 @@ services:
       - mongodb
       - redis
       - mysql
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - zhilian-network
     volumes:
@@ -98,7 +105,7 @@ services:
   celery-worker:
     build: ./backend
     container_name: zhilian-celery-worker
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+    command: sh -c "python wait_for_db.py && celery -A app.tasks.celery_app worker --loglevel=info"
     environment:
       - TZ=Asia/Shanghai
       - NEO4J_URI=bolt://neo4j:7687
@@ -117,6 +124,7 @@ services:
       - redis
       - mysql
       - backend
+    restart: on-failure
     networks:
       - zhilian-network
     volumes:
@@ -140,6 +148,7 @@ services:
     depends_on:
       - redis
       - celery-worker
+    restart: on-failure
     networks:
       - zhilian-network
     volumes:
@@ -157,6 +166,7 @@ services:
     depends_on:
       - redis
       - celery-worker
+    restart: on-failure
     networks:
       - zhilian-network
 
