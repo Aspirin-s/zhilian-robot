@@ -83,39 +83,79 @@ class GraphService:
             return {"success": False, "error": str(e)}
     
     def _save_to_graph(self, entities: Dict, relations: List[Dict]):
-        """保存实体和关系到Neo4j"""
-        # 创建实体节点
+        """保存实体和关系到Neo4j(智能合并,避免重复)"""
+        # 创建实体节点 - 使用MERGE避免重复
         for category, items in entities.items():
             for item in items:
-                query = """
-                MERGE (n:Entity {name: $name, type: $type})
-                """
-                self.neo4j.execute_write(query, {
-                    "name": item,
-                    "type": category
-                })
+                self._merge_entity(item, category)
         
-        # 创建关系
+        # 创建关系 - 智能合并
         for relation in relations:
-            # 将关系类型转换为有效的Neo4j关系类型(移除空格和特殊字符)
-            relation_type = relation.get("relation", "RELATION")
-            # 保留原始关系名称作为属性
-            relation_label = relation_type
-            # Neo4j关系类型不能有空格,转换为下划线
-            relation_type_safe = relation_type.replace(" ", "_").replace("-", "_").upper()
-            
-            query = f"""
-            MATCH (a:Entity {{name: $subject}})
-            MATCH (b:Entity {{name: $object}})
-            MERGE (a)-[r:{relation_type_safe} {{label: $label}}]->(b)
-            SET r.confidence = $confidence
-            """
-            self.neo4j.execute_write(query, {
-                "subject": relation.get("subject"),
-                "object": relation.get("object"),
-                "label": relation_label,
-                "confidence": relation.get("confidence", 0.9)
-            })
+            self._merge_relation(relation)
+    
+    def _merge_entity(self, name: str, entity_type: str, confidence: float = 0.9):
+        """
+        智能合并实体节点
+        - 如果不存在则创建
+        - 如果已存在则更新置信度和时间戳
+        """
+        query = """
+        MERGE (e:Entity {name: $name})
+        ON CREATE SET
+            e.type = $type,
+            e.confidence = $confidence,
+            e.created_at = datetime(),
+            e.updated_at = datetime(),
+            e.occurrence_count = 1
+        ON MATCH SET
+            e.updated_at = datetime(),
+            e.occurrence_count = e.occurrence_count + 1,
+            e.confidence = CASE
+                WHEN $confidence > e.confidence THEN $confidence
+                ELSE e.confidence
+            END
+        RETURN e
+        """
+        self.neo4j.execute_write(query, {
+            "name": name,
+            "type": entity_type,
+            "confidence": confidence
+        })
+    
+    def _merge_relation(self, relation: Dict):
+        """
+        智能合并关系
+        - 如果不存在则创建
+        - 如果已存在则更新置信度(取平均值)
+        """
+        # 将关系类型转换为有效的Neo4j关系类型(移除空格和特殊字符)
+        relation_type = relation.get("relation", "RELATION")
+        relation_label = relation_type
+        relation_type_safe = relation_type.replace(" ", "_").replace("-", "_").upper()
+        
+        query = f"""
+        MATCH (a:Entity {{name: $subject}})
+        MATCH (b:Entity {{name: $object}})
+        MERGE (a)-[r:{relation_type_safe}]->(b)
+        ON CREATE SET
+            r.label = $label,
+            r.confidence = $confidence,
+            r.created_at = datetime(),
+            r.updated_at = datetime(),
+            r.occurrence_count = 1
+        ON MATCH SET
+            r.updated_at = datetime(),
+            r.occurrence_count = r.occurrence_count + 1,
+            r.confidence = (r.confidence + $confidence) / 2
+        RETURN r
+        """
+        
+        self.neo4j.execute_write(query, {
+            "subject": relation.get("subject"),
+            "object": relation.get("object"),
+            "label": relation_label,
+            "confidence": relation.get("confidence", 0.9)
+        })
     
     def query_industry_chain(self, company_name: str, depth: int = 2) -> Dict:
         """

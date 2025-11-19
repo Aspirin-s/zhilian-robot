@@ -4,7 +4,8 @@ import {
   DeploymentUnitOutlined, 
   LinkOutlined, 
   FileTextOutlined,
-  RocketOutlined 
+  RocketOutlined,
+  DatabaseOutlined 
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { graphService } from '../services/api'
@@ -106,14 +107,17 @@ const HomePage = () => {
             hoverable
             style={{ height: '100%' }}
           >
-            <RocketOutlined style={{ fontSize: 48, color: '#faad14' }} />
-            <Title level={4} style={{ marginTop: 16 }}>核心功能</Title>
+            <DatabaseOutlined style={{ fontSize: 48, color: '#722ed1' }} />
+            <Title level={4} style={{ marginTop: 16 }}>数据管理</Title>
             <Paragraph>
-              • 智能实体识别(NER)<br/>
-              • 关系抽取(RE)<br/>
-              • 知识图谱构建<br/>
-              • 动态可视化
+              • 自动数据采集(爬虫)<br/>
+              • RSS订阅更新<br/>
+              • 文章处理与分析<br/>
+              • 任务历史追踪
             </Paragraph>
+            <Button type="primary" onClick={() => navigate('/data')}>
+              开始管理
+            </Button>
           </Card>
         </Col>
       </Row>

@@ -35,7 +35,10 @@ class MongoDBConnection:
             logger.info("MongoDB连接已关闭")
     
     def get_collection(self, collection_name: str):
-        """获取集合"""
+        """获取集合,如果未连接则自动连接"""
+        if self._db is None:
+            logger.warning("MongoDB未连接,正在自动连接...")
+            self.connect()
         return self._db[collection_name]
     
     def insert_one(self, collection_name: str, document: dict):

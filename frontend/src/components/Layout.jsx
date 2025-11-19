@@ -4,7 +4,8 @@ import {
   HomeOutlined, 
   DeploymentUnitOutlined, 
   BarChartOutlined,
-  RobotOutlined 
+  RobotOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 
@@ -29,6 +30,11 @@ const Layout = ({ children }) => {
       key: '/analysis',
       icon: <BarChartOutlined />,
       label: '文本分析',
+    },
+    {
+      key: '/data',
+      icon: <DatabaseOutlined />,
+      label: '数据管理',
     },
   ]
 

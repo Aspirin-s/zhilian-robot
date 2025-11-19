@@ -8,7 +8,6 @@ import {
   Tag, 
   Table,
   Space,
-  Switch,
   Divider 
 } from 'antd'
 import { 
@@ -23,7 +22,6 @@ const { TextArea } = Input
 const AnalysisPage = () => {
   const [loading, setLoading] = useState(false)
   const [text, setText] = useState('')
-  const [useLLM, setUseLLM] = useState(false)
   const [entities, setEntities] = useState({})
   const [relations, setRelations] = useState([])
 
@@ -35,20 +33,10 @@ const AnalysisPage = () => {
 
     setLoading(true)
     try {
-      let data
-      if (useLLM) {
-        // 使用 DeepSeek LLM 分析
-        data = await nlpService.analyzeTextWithLLM({
-          text: text
-        })
-      } else {
-        // 使用传统 NLP 分析
-        data = await nlpService.analyzeText({
-          text: text,
-          extract_entities: true,
-          extract_relations: true
-        })
-      }
+      // 使用 DeepSeek LLM 分析
+      const data = await nlpService.analyzeTextWithLLM({
+        text: text
+      })
 
       setEntities(data.entities || {})
       setRelations(data.relations || [])
@@ -125,13 +113,9 @@ const AnalysisPage = () => {
 
           <div>
             <div style={{ marginBottom: 8 }}>
-              <Space>
-                <span>使用大模型分析:</span>
-                <Switch checked={useLLM} onChange={setUseLLM} />
-                <Button size="small" onClick={() => setText(sampleText)}>
-                  加载示例文本
-                </Button>
-              </Space>
+              <Button size="small" onClick={() => setText(sampleText)}>
+                加载示例文本
+              </Button>
             </div>
             <TextArea
               value={text}

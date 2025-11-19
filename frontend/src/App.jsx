@@ -6,6 +6,7 @@ import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import GraphPage from './pages/GraphPage'
 import AnalysisPage from './pages/AnalysisPage'
+import DataManagePage from './pages/DataManagePage'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/graph" element={<GraphPage />} />
             <Route path="/analysis" element={<AnalysisPage />} />
+            <Route path="/data" element={<DataManagePage />} />
           </Routes>
         </Layout>
       </Router>

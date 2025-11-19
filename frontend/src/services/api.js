@@ -62,3 +62,64 @@ export const graphService = {
     return apiClient.delete('/api/v1/graph/clear')
   }
 }
+
+// 数据采集相关API
+export const dataService = {
+  // 获取文章列表
+  getArticles: (params = {}) => {
+    return apiClient.get('/api/v1/data/articles', { params })
+  },
+
+  // 获取数据统计
+  getDataStatistics: () => {
+    return apiClient.get('/api/v1/data/statistics')
+  },
+
+  // 手动触发关键词爬取
+  crawlKeyword: (keyword) => {
+    return apiClient.post('/api/v1/data/crawl', null, {
+      params: { keyword }
+    })
+  },
+
+  // 手动触发RSS更新
+  updateRss: () => {
+    return apiClient.post('/api/v1/data/rss/update')
+  },
+
+  // 处理文章(提取实体关系并保存到图谱)
+  processArticle: (articleId) => {
+    return apiClient.post(`/api/v1/data/process/${articleId}`)
+  },
+
+  // 批量处理文章
+  batchProcessArticles: (articleIds) => {
+    return apiClient.post('/api/v1/data/process/batch', {
+      article_ids: articleIds
+    })
+  },
+
+  // 删除文章
+  deleteArticle: (articleId) => {
+    return apiClient.delete(`/api/v1/data/articles/${articleId}`)
+  },
+
+  // 批量删除文章
+  batchDeleteArticles: (articleIds) => {
+    return apiClient.post('/api/v1/data/articles/delete/batch', {
+      article_ids: articleIds
+    })
+  },
+
+  // 清理旧数据
+  cleanupOldData: (days = 30) => {
+    return apiClient.delete('/api/v1/data/cleanup', {
+      params: { days }
+    })
+  },
+
+  // 获取任务历史
+  getTaskHistory: (params = {}) => {
+    return apiClient.get('/api/v1/data/tasks/history', { params })
+  }
+}

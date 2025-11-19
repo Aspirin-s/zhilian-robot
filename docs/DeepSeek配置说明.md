@@ -1,242 +1,325 @@
 # DeepSeek API 配置说明
 
-## 📖 概述
+## 1. 概述
 
-本项目已配置为使用 DeepSeek API,这是一个高性能、成本效益高的大语言模型 API 服务,完全兼容 OpenAI API 接口。
+智链机器人使用 **DeepSeek API** 作为核心 LLM 服务,用于文本分析、实体提取和关系抽取。DeepSeek 是一个高性能、成本效益极高的大语言模型 API,完全兼容 OpenAI API 接口。
 
-## 🔑 API 密钥配置
+## 2. 获取 API 密钥
 
-### 当前配置
+### 2.1 注册账号
 
-项目已配置您的 DeepSeek API 密钥:
-- **API Key**: `sk-08266faa1d184709878869666545ea9a`
-- **Base URL**: `https://api.deepseek.com`
-- **模型**: `deepseek-chat`
+1. 访问 DeepSeek 官网: https://platform.deepseek.com/
+2. 点击 **"注册"** 按钮
+3. 使用邮箱或手机号完成注册
+4. 登录后进入控制台
 
-### 配置文件位置
+### 2.2 创建 API 密钥
 
-环境变量配置在 `backend\.env`:
+1. 在控制台点击 **"API Keys"**
+2. 点击 **"Create API Key"** 按钮
+3. 输入密钥名称(如: `zhilian-robot`)
+4. 复制生成的密钥(格式: `sk-xxxxxxxxxxxxxx`)
+
+**重要**: 密钥只显示一次,请妥善保存!
+
+## 3. 配置项目
+
+### 3.1 编辑环境变量
+
+编辑 `backend/.env` 文件:
 
 ```env
-# DeepSeek API (Compatible with OpenAI interface)
-OPENAI_API_KEY=sk-08266faa1d184709878869666545ea9a
+# DeepSeek API 配置(兼容 OpenAI 接口格式)
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxx      # 替换为你的密钥
 OPENAI_API_BASE=https://api.deepseek.com
 OPENAI_MODEL=deepseek-chat
 ```
 
-## 🎯 支持的功能
+### 3.2 重启后端服务
 
-### 1. 实体提取
-使用 DeepSeek 从文本中提取产业链相关实体:
-- 企业名称
-- 产品名称
-- 技术名称
-- 关键人物
-- 地点信息
+```bash
+# 在项目根目录执行
+docker-compose restart backend
 
-### 2. 关系抽取
-识别实体之间的关系:
-- 供应关系
-- 合作关系
-- 竞争关系
-- 上下游关系
-
-### 3. 知识图谱构建
-基于提取的实体和关系构建产业链知识图谱
-
-## 💰 成本优势
-
-DeepSeek 相比 OpenAI 的优势:
-
-| 项目 | OpenAI GPT-4 | DeepSeek Chat |
-|------|--------------|---------------|
-| 输入价格 | $30/1M tokens | $0.14/1M tokens |
-| 输出价格 | $60/1M tokens | $0.28/1M tokens |
-| 性能 | 优秀 | 优秀 |
-| 中文支持 | 良好 | 优秀 |
-
-**成本节省**: 约为 GPT-4 的 **1%** 💡
-
-## 🚀 可用模型
-
-### 推荐模型
-
-1. **deepseek-chat** (默认)
-   - 用途: 对话、文本生成、信息提取
-   - 上下文: 64K tokens
-   - 推荐场景: 本项目的所有 NLP 任务
-
-2. **deepseek-coder**
-   - 用途: 代码生成、代码理解
-   - 上下文: 64K tokens
-   - 推荐场景: 如需处理代码相关内容
-
-### 切换模型
-
-修改 `backend\.env`:
-```env
-OPENAI_MODEL=deepseek-coder  # 切换到代码模型
+# 查看后端日志,确认配置加载成功
+docker-compose logs backend
 ```
 
-## 📝 API 使用示例
+## 4. 支持的模型
 
-### Python 代码示例
+### 4.1 deepseek-chat (默认推荐)
+
+**特点:**
+- 通用对话和文本生成
+- 上下文长度: 64K tokens
+- 中文支持优秀
+- 适合本项目的所有 NLP 任务
+
+**定价:**
+- 输入: $0.14 / 1M tokens
+- 输出: $0.28 / 1M tokens
+
+**使用场景:**
+- 实体提取(企业、产品、技术、人物、地点)
+- 关系抽取(供应、合作、竞争关系)
+- 文本摘要和分类
+
+### 4.2 deepseek-coder
+
+**特点:**
+- 代码生成和理解
+- 上下文长度: 64K tokens
+- 支持多种编程语言
+
+**定价:**
+- 输入: $0.14 / 1M tokens
+- 输出: $0.28 / 1M tokens
+
+**切换方法:**
+编辑 `backend/.env`:
+```env
+OPENAI_MODEL=deepseek-coder
+```
+
+## 5. 成本优势
+
+### 5.1 价格对比
+
+| 模型 | 输入价格 | 输出价格 | 性能 | 中文支持 |
+|------|---------|---------|------|---------|
+| OpenAI GPT-4 | $30/1M | $60/1M | 优秀 | 良好 |
+| DeepSeek Chat | $0.14/1M | $0.28/1M | 优秀 | 优秀 |
+
+**成本节省**: DeepSeek 约为 GPT-4 的 **1%** 💡
+
+### 5.2 使用量估算
+
+假设每天处理 100 篇文章:
+- 每篇文章平均 1000 tokens 输入
+- 每篇文章平均 500 tokens 输出
+
+**每日成本:**
+- 输入: 100 × 1000 × $0.14 / 1,000,000 = $0.014
+- 输出: 100 × 500 × $0.28 / 1,000,000 = $0.014
+- **总计**: $0.028/天 ≈ **$0.84/月**
+
+使用 GPT-4 的话,同样工作量约为 **$84/月**。
+
+## 6. API 使用示例
+
+### 6.1 Python 代码示例
 
 ```python
 from openai import OpenAI
 
+# 初始化客户端
 client = OpenAI(
-    api_key="sk-08266faa1d184709878869666545ea9a",
+    api_key="sk-xxxxxxxxxxxxxx",
     base_url="https://api.deepseek.com"
 )
 
+# 实体提取示例
 response = client.chat.completions.create(
     model="deepseek-chat",
     messages=[
-        {"role": "system", "content": "你是一个产业链分析助手"},
-        {"role": "user", "content": "分析机器人产业链"}
-    ]
+        {
+            "role": "system", 
+            "content": "你是一个产业链分析助手,专门从文本中提取企业、产品、技术等实体。"
+        },
+        {
+            "role": "user", 
+            "content": "华为发布了新款Mate60手机,搭载麒麟9000S芯片。"
+        }
+    ],
+    temperature=0.7,
+    max_tokens=2000
 )
 
 print(response.choices[0].message.content)
 ```
 
-### 项目中的使用
+### 6.2 API 参数说明
 
-在 `backend/app/nlp/llm.py` 中已配置:
+**常用参数:**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| model | string | - | 模型名称(deepseek-chat) |
+| messages | array | - | 对话消息列表 |
+| temperature | float | 1.0 | 随机性(0-2),越低越确定 |
+| max_tokens | int | 4096 | 最大输出长度 |
+| top_p | float | 1.0 | 核采样参数 |
+| stream | bool | false | 是否流式输出 |
+
+**推荐配置:**
+- 实体提取: `temperature=0.3` (需要准确性)
+- 文本生成: `temperature=0.7` (需要创造性)
+- 关系抽取: `temperature=0.5` (平衡准确性和多样性)
+
+## 7. 本项目的集成方式
+
+### 7.1 服务封装
+
+项目在 `backend/app/services/deepseek_service.py` 封装了 DeepSeek API:
 
 ```python
-class LLMProcessor:
+class DeepSeekService:
     def __init__(self):
-        # 自动使用 DeepSeek API
         self.client = OpenAI(
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_API_BASE
         )
-        self.model = settings.OPENAI_MODEL  # deepseek-chat
+    
+    async def extract_entities(self, text: str) -> dict:
+        """从文本中提取实体"""
+        # 调用 DeepSeek API
+        response = await self.client.chat.completions.create(...)
+        return parsed_result
+    
+    async def extract_relations(self, text: str, entities: list) -> list:
+        """从文本中提取关系"""
+        # 调用 DeepSeek API
+        response = await self.client.chat.completions.create(...)
+        return relations
 ```
 
-## 🔧 测试 API
+### 7.2 API 端点
 
-### 1. 使用 curl 测试
+前端通过以下 API 使用 DeepSeek:
 
-```bash
-curl https://api.deepseek.com/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-08266faa1d184709878869666545ea9a" \
-  -d '{
-    "model": "deepseek-chat",
-    "messages": [
-      {"role": "user", "content": "你好"}
-    ]
-  }'
-```
+**POST /api/v1/analysis/analyze**
+- 输入: 文本内容
+- 输出: 提取的实体和关系
 
-### 2. 使用 Python 测试
+**POST /api/v1/analysis/save**
+- 输入: 实体和关系数据
+- 输出: 保存到 Neo4j 的结果
 
-创建测试文件 `test_deepseek.py`:
+### 7.3 提示词工程
+
+项目使用结构化提示词确保输出格式一致:
 
 ```python
-from openai import OpenAI
+ENTITY_EXTRACTION_PROMPT = """
+你是一个产业链分析专家。请从以下文本中提取实体:
 
-client = OpenAI(
-    api_key="sk-08266faa1d184709878869666545ea9a",
-    base_url="https://api.deepseek.com"
-)
+1. 企业(companies): 公司、组织名称
+2. 产品(products): 产品、服务名称
+3. 技术(technologies): 技术、算法、标准
+4. 人物(persons): 关键人物、高管
+5. 地点(locations): 地理位置
 
-try:
-    response = client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[{"role": "user", "content": "你好,请介绍一下你自己"}],
-    )
-    print("✅ API 连接成功!")
-    print(f"回复: {response.choices[0].message.content}")
-except Exception as e:
-    print(f"❌ API 连接失败: {e}")
+请以JSON格式返回,例如:
+{
+  "companies": ["华为", "小米"],
+  "products": ["Mate60"],
+  "technologies": ["麒麟9000S"],
+  "persons": [],
+  "locations": ["深圳"]
+}
+
+文本内容:
+{text}
+"""
 ```
 
-运行测试:
-```bash
-cd backend
-python test_deepseek.py
+## 8. 故障排查
+
+### 问题1: API 密钥无效
+
+**错误信息:**
+```
+AuthenticationError: Invalid API key
 ```
 
-## 📊 监控使用情况
+**解决方法:**
+1. 检查 `backend/.env` 中的密钥格式
+2. 确认密钥以 `sk-` 开头
+3. 登录 DeepSeek 控制台验证密钥状态
+4. 重新创建密钥并更新配置
 
-### 查看用量
+### 问题2: 请求超时
 
-访问 DeepSeek 控制台:
-- 网址: https://platform.deepseek.com
-- 登录后查看 Usage Dashboard
+**错误信息:**
+```
+TimeoutError: Request timeout
+```
 
-### 设置用量提醒
+**解决方法:**
+1. 检查网络连接
+2. 增加超时时间(在 `deepseek_service.py` 中配置)
+3. 减少 `max_tokens` 参数
+4. 使用更短的输入文本
 
-在 DeepSeek 平台可以设置:
-- 每日用量限制
-- 余额预警
-- 邮件通知
+### 问题3: 输出格式错误
 
-## ⚠️ 注意事项
+**错误信息:**
+```
+JSONDecodeError: Expecting value
+```
 
-### 1. API 限流
-- 免费用户: 60 请求/分钟
-- 付费用户: 更高限制
+**解决方法:**
+1. 降低 `temperature` 参数(如 0.3)
+2. 在提示词中强调 JSON 格式要求
+3. 添加输出验证和错误重试逻辑
 
-### 2. 上下文长度
-- 最大: 64K tokens
-- 建议: 保持在 32K 以内以获得最佳性能
+### 问题4: 速率限制
 
-### 3. 超时设置
+**错误信息:**
+```
+RateLimitError: Rate limit exceeded
+```
+
+**解决方法:**
+1. 降低请求频率
+2. 使用 Celery 队列控制并发
+3. 升级 DeepSeek 套餐(如有)
+4. 添加请求间隔(如 0.5秒)
+
+## 9. 最佳实践
+
+### 9.1 提示词优化
+
+- 明确任务目标和输出格式
+- 提供少量示例(few-shot learning)
+- 使用结构化输出(JSON/YAML)
+- 测试不同的 temperature 值
+
+### 9.2 错误处理
+
 ```python
-client = OpenAI(
-    api_key="sk-08266faa1d184709878869666545ea9a",
-    base_url="https://api.deepseek.com",
-    timeout=30.0  # 30秒超时
+import asyncio
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10)
 )
+async def call_deepseek_api(text: str):
+    """带重试机制的 API 调用"""
+    try:
+        response = await client.chat.completions.create(...)
+        return response
+    except Exception as e:
+        logger.error(f"DeepSeek API 错误: {e}")
+        raise
 ```
 
-## 🔄 如需切换回 OpenAI
+### 9.3 成本控制
 
-如果将来想切换回 OpenAI,只需修改 `backend\.env`:
+- 设置 `max_tokens` 上限(如 2000)
+- 对长文本进行分段处理
+- 缓存常见查询结果
+- 使用批量处理减少请求次数
 
-```env
-# OpenAI API
-OPENAI_API_KEY=sk-your-openai-key
-OPENAI_API_BASE=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4
-```
+## 10. 相关资源
 
-代码无需修改,完全兼容!
-
-## 📚 相关资源
-
-- [DeepSeek 官网](https://www.deepseek.com)
-- [DeepSeek 平台](https://platform.deepseek.com)
-- [API 文档](https://platform.deepseek.com/api-docs)
-- [定价信息](https://platform.deepseek.com/pricing)
-
-## 🆘 常见问题
-
-### Q: API 调用失败怎么办?
-A: 检查以下内容:
-1. API Key 是否正确
-2. 网络连接是否正常
-3. 是否超过使用限额
-4. Base URL 是否正确设置
-
-### Q: 如何查看 API 调用日志?
-A: 查看项目日志文件 `backend/logs/app.log`
-
-### Q: 支持流式输出吗?
-A: 支持,设置 `stream=True`:
-```python
-response = client.chat.completions.create(
-    model="deepseek-chat",
-    messages=[...],
-    stream=True
-)
-```
+- **DeepSeek 官网**: https://www.deepseek.com/
+- **API 文档**: https://platform.deepseek.com/docs
+- **定价说明**: https://platform.deepseek.com/pricing
+- **社区支持**: https://github.com/deepseek-ai
 
 ---
 
-**配置完成!** 现在您可以使用 DeepSeek API 进行产业链知识图谱构建了 🎉
+**版本**: v1.0  
+**更新日期**: 2025-01-19

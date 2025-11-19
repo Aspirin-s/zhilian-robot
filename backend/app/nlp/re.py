@@ -1,19 +1,34 @@
 """
 NLP模块 - 关系抽取(RE)
 """
-from transformers import AutoTokenizer, AutoModel
+try:
+    from transformers import AutoTokenizer, AutoModel
+    import torch
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+
 from config.settings import settings
 import logging
-import torch
 from typing import List, Dict, Tuple
 
 logger = logging.getLogger(__name__)
+
+if not TRANSFORMERS_AVAILABLE:
+    logger.info("transformers/torch 未安装，关系抽取功能将被禁用。项目将使用 DeepSeek LLM 进行关系抽取。")
 
 
 class REProcessor:
     """关系抽取处理器"""
     
     def __init__(self):
+        if not TRANSFORMERS_AVAILABLE:
+            self.model_name = None
+            self.tokenizer = None
+            self.model = None
+            self.relation_types = []
+            return
+            
         self.model_name = settings.RE_MODEL
         self.tokenizer = None
         self.model = None
@@ -33,6 +48,10 @@ class REProcessor:
     
     def load_model(self):
         """加载关系抽取模型"""
+        if not TRANSFORMERS_AVAILABLE:
+            logger.warning("跳过 RE 模型加载：transformers 未安装")
+            return
+            
         try:
             logger.info(f"正在加载RE模型: {self.model_name}")
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -46,104 +65,70 @@ class REProcessor:
         """
         从文本中提取实体间关系
         
-        Args:
-            text: 输入文本
-            entities: 已识别的实体列表
-            
-        Returns:
-            关系三元组列表 [(subject, relation, object), ...]
+        如果 transformers 未安装，返回空列表
         """
-        if not self.model:
-            self.load_model()
+        if not TRANSFORMERS_AVAILABLE:
+            logger.debug("RE功能未启用，返回空结果。请使用 DeepSeek LLM 进行关系抽取。")
+            return []
         
-        relations = []
-        
-        # 对每对实体进行关系判断
-        for i, entity1 in enumerate(entities):
-            for entity2 in entities[i+1:]:
-                relation = self._predict_relation(text, entity1, entity2)
-                if relation:
-                    relations.append({
-                        "subject": entity1["text"],
-                        "relation": relation,
-                        "object": entity2["text"],
-                        "confidence": 0.8  # TODO: 实际置信度计算
-                    })
-        
-        return relations
+        try:
+            if len(entities) < 2:
+                return []
+            
+            relations = []
+            # 简化版关系抽取逻辑
+            # 实际应该使用更复杂的模型
+            for i, entity1 in enumerate(entities):
+                for entity2 in entities[i+1:]:
+                    relation = self._predict_relation(text, entity1, entity2)
+                    if relation:
+                        relations.append(relation)
+            
+            return relations
+        except Exception as e:
+            logger.error(f"关系抽取失败: {str(e)}")
+            return []
     
-    def _predict_relation(self, text: str, entity1: Dict, entity2: Dict) -> str:
+    def _predict_relation(self, text: str, entity1: Dict, entity2: Dict) -> Dict:
         """
         预测两个实体之间的关系
         
-        Args:
-            text: 原文本
-            entity1: 实体1
-            entity2: 实体2
-            
-        Returns:
-            关系类型或None
+        这是一个简化版实现,实际应该使用训练好的模型
         """
-        # TODO: 实现基于大模型的关系分类
-        # 这里使用规则匹配作为临时方案
+        if not TRANSFORMERS_AVAILABLE:
+            return None
+            
+        # 这里应该是实际的模型预测逻辑
+        # 为了简化,返回基于规则的关系
         
-        e1_text = entity1["text"]
-        e2_text = entity2["text"]
+        # 基于文本中的关键词判断关系
+        relation_keywords = {
+            "供应商": ["供应", "提供", "采购自"],
+            "客户": ["客户", "销售给", "服务"],
+            "合作伙伴": ["合作", "联合", "共同"],
+            "竞争对手": ["竞争", "对手"],
+            "投资方": ["投资", "注资", "股东"],
+            "子公司": ["子公司", "全资", "控股"],
+            "母公司": ["母公司", "总部"],
+        }
         
-        # 简单的规则匹配
-        if "供应" in text or "提供" in text:
-            return "供应商"
-        elif "合作" in text:
-            return "合作伙伴"
-        elif "竞争" in text:
-            return "竞争对手"
-        elif "投资" in text:
-            return "投资方"
-        elif "子公司" in text or "全资" in text:
-            return "子公司"
+        entity1_text = entity1.get('text', '')
+        entity2_text = entity2.get('text', '')
+        
+        for rel_type, keywords in relation_keywords.items():
+            for keyword in keywords:
+                if keyword in text:
+                    # 检查实体是否在关键词附近
+                    if entity1_text in text and entity2_text in text:
+                        return {
+                            'head': entity1_text,
+                            'relation': rel_type,
+                            'tail': entity2_text,
+                            'confidence': 0.5  # 规则based的置信度较低
+                        }
         
         return None
-    
-    def extract_supply_chain_relations(self, text: str, entities: Dict) -> List[Dict]:
-        """
-        提取产业链上下游关系
-        
-        Args:
-            text: 输入文本
-            entities: 分类后的实体字典
-            
-        Returns:
-            产业链关系列表
-        """
-        relations = []
-        companies = entities.get("companies", [])
-        
-        # 提取公司间的关系
-        for i, company1 in enumerate(companies):
-            for company2 in companies[i+1:]:
-                # 检查上下游关系
-                if self._is_upstream(text, company1, company2):
-                    relations.append({
-                        "upstream": company1,
-                        "downstream": company2,
-                        "relation_type": "supply_chain"
-                    })
-                elif self._is_upstream(text, company2, company1):
-                    relations.append({
-                        "upstream": company2,
-                        "downstream": company1,
-                        "relation_type": "supply_chain"
-                    })
-        
-        return relations
-    
-    def _is_upstream(self, text: str, company1: str, company2: str) -> bool:
-        """判断company1是否是company2的上游"""
-        # 简化的规则判断
-        keywords = ["供应", "提供", "零部件", "原材料", "芯片"]
-        context = text[max(0, text.find(company1)-50):min(len(text), text.find(company2)+50)]
-        return any(keyword in context for keyword in keywords)
 
 
-# 全局RE处理器实例
+# 全局实例
 re_processor = REProcessor()
