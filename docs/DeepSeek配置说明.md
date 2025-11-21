@@ -29,11 +29,16 @@
 编辑 `backend/.env` 文件:
 
 ```env
-# DeepSeek API 配置(兼容 OpenAI 接口格式)
+# DeepSeek API 配置(使用 OpenAI SDK 1.57.0 兼容格式)
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxx      # 替换为你的密钥
 OPENAI_API_BASE=https://api.deepseek.com
 OPENAI_MODEL=deepseek-chat
 ```
+
+**SDK 版本说明:**
+- 本项目使用 `openai>=1.57.0` SDK
+- 通过设置 `OPENAI_API_BASE` 重定向到 DeepSeek 服务器
+- 完全兼容 OpenAI 客户端接口
 
 ### 3.2 重启后端服务
 

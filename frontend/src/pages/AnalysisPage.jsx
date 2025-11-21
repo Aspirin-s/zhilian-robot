@@ -1,46 +1,35 @@
 import React, { useState } from 'react'
 import { 
-  Card, 
-  Input, 
-  Button, 
-  message, 
-  Spin, 
-  Tag, 
-  Table,
-  Space,
-  Divider 
+  Card, Input, Button, message, Spin, Tag, Space, Row, Col, Typography, Divider 
 } from 'antd'
 import { 
-  FileTextOutlined, 
-  ThunderboltOutlined,
-  SaveOutlined 
+  ThunderboltOutlined, 
+  SaveOutlined, 
+  ClearOutlined,
+  BulbOutlined
 } from '@ant-design/icons'
 import { nlpService, graphService } from '../services/api'
 
 const { TextArea } = Input
+const { Title, Text } = Typography
 
 const AnalysisPage = () => {
   const [loading, setLoading] = useState(false)
   const [text, setText] = useState('')
-  const [entities, setEntities] = useState({})
-  const [relations, setRelations] = useState([])
+  const [result, setResult] = useState({ entities: {}, relations: [] })
+
+  const sampleText = `华为技术有限公司是一家领先的全球信息与通信技术解决方案供应商。该公司与台积电合作,采购先进的芯片制造服务。华为的主要产品包括智能手机、通信设备和云计算解决方案。在机器人领域,华为与ABB、库卡等公司建立合作关系,共同推进工业机器人的智能化发展。`
 
   const handleAnalyze = async () => {
-    if (!text.trim()) {
-      message.warning('请输入要分析的文本')
-      return
-    }
-
+    if (!text.trim()) return message.warning('请输入文本')
     setLoading(true)
     try {
-      // 使用 DeepSeek LLM 分析
-      const data = await nlpService.analyzeTextWithLLM({
-        text: text
+      const data = await nlpService.analyzeTextWithLLM({ text })
+      setResult({
+        entities: data.entities || {},
+        relations: data.relations || []
       })
-
-      setEntities(data.entities || {})
-      setRelations(data.relations || [])
-      message.success(data.summary || '分析完成')
+      message.success('分析完成')
     } catch (error) {
       message.error('分析失败: ' + error.message)
     } finally {
@@ -48,150 +37,233 @@ const AnalysisPage = () => {
     }
   }
 
-  const handleBuildGraph = async () => {
-    if (Object.keys(entities).length === 0) {
-      message.warning('请先分析文本')
-      return
-    }
-
+  const handleSave = async () => {
     setLoading(true)
     try {
-      // 直接传递已分析的实体和关系数据,避免重复分析
-      const result = await graphService.saveToGraph(entities, relations)
-      if (result.success) {
-        message.success(`图谱构建成功! 保存了 ${result.entities_count} 个实体, ${result.relations_count} 个关系`)
-      } else {
-        message.error('图谱构建失败: ' + result.error)
-      }
+      const res = await graphService.saveToGraph(result.entities, result.relations)
+      if (res.success) message.success(`已保存: ${res.entities_count} 实体, ${res.relations_count} 关系`)
+      else message.error('保存失败: ' + res.error)
     } catch (error) {
-      message.error('图谱构建失败: ' + error.message)
+      message.error('错误: ' + error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const relationColumns = [
-    {
-      title: '主体',
-      dataIndex: 'subject',
-      key: 'subject',
-    },
-    {
-      title: '关系',
-      dataIndex: 'relation',
-      key: 'relation',
-      render: (text) => <Tag color="blue">{text}</Tag>
-    },
-    {
-      title: '客体',
-      dataIndex: 'object',
-      key: 'object',
-    },
-    {
-      title: '置信度',
-      dataIndex: 'confidence',
-      key: 'confidence',
-      render: (val) => (val * 100).toFixed(0) + '%'
-    }
-  ]
-
-  const sampleText = `
-华为技术有限公司是一家领先的全球信息与通信技术解决方案供应商。
-该公司与台积电合作,采购先进的芯片制造服务。华为的主要产品包括智能手机、
-通信设备和云计算解决方案。在机器人领域,华为与ABB、库卡等公司建立合作关系,
-共同推进工业机器人的智能化发展。
-  `.trim()
+  // 实体颜色映射
+  const getEntityColor = (type) => {
+    const colors = { companies: '#3b82f6', products: '#22c55e', technologies: '#eab308', persons: '#ef4444', locations: '#06b6d4' }
+    return colors[type] || 'default'
+  }
 
   return (
-    <div>
-      <Card style={{ marginBottom: 16 }}>
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <div>
-            <h2><FileTextOutlined /> 文本分析</h2>
-            <p>输入产业相关文本,自动提取实体和关系,并构建知识图谱</p>
-          </div>
-
-          <div>
-            <div style={{ marginBottom: 8 }}>
-              <Button size="small" onClick={() => setText(sampleText)}>
-                加载示例文本
-              </Button>
-            </div>
-            <TextArea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="请输入要分析的文本内容,如行业报告、新闻资讯等..."
-              rows={8}
-            />
-          </div>
-
-          <Space>
+    <Row gutter={24} style={{ height: 'calc(100vh - 120px)' }}>
+      {/* 左侧：输入区 */}
+      <Col xs={24} lg={10} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Card 
+          title={<Space><ThunderboltOutlined style={{ color: '#6366f1' }}/> <span style={{ color: '#f1f5f9' }}>文本输入</span></Space>} 
+          style={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            border: '1px solid #334155',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+          }}
+          bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+          extra={
+            <Button 
+              type="link" 
+              size="small" 
+              onClick={() => setText(sampleText)}
+              style={{ color: '#6366f1' }}
+            >
+              加载示例
+            </Button>
+          }
+        >
+          <TextArea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="在此粘贴行业新闻、研报摘要或公司公告..."
+            style={{ 
+              flex: 1, 
+              resize: 'none', 
+              marginBottom: 20, 
+              padding: 14, 
+              fontSize: 15, 
+              background: '#0f172a', 
+              border: '1px solid #334155',
+              color: '#e2e8f0',
+              borderRadius: 8
+            }}
+          />
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button 
+              icon={<ClearOutlined />} 
+              onClick={() => {setText(''); setResult({entities:{}, relations:[]})}}
+              style={{ 
+                background: '#1e293b', 
+                border: '1px solid #334155', 
+                color: '#94a3b8' 
+              }}
+            >
+              清空
+            </Button>
             <Button 
               type="primary" 
-              icon={<ThunderboltOutlined />}
+              icon={<BulbOutlined />} 
+              loading={loading} 
               onClick={handleAnalyze}
-              loading={loading}
+              style={{ background: '#6366f1', border: 'none' }}
             >
-              分析文本
-            </Button>
-            <Button 
-              icon={<SaveOutlined />}
-              onClick={handleBuildGraph}
-              loading={loading}
-              disabled={Object.keys(entities).length === 0}
-            >
-              保存到图谱
+              智能分析
             </Button>
           </Space>
-        </Space>
-      </Card>
+        </Card>
+      </Col>
 
-      <Spin spinning={loading}>
-        {Object.keys(entities).length > 0 && (
-          <Card title="提取的实体" style={{ marginBottom: 16 }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              {Object.entries(entities).map(([category, items]) => (
-                items.length > 0 && (
-                  <div key={category}>
-                    <strong>{getCategoryLabel(category)}:</strong>
-                    <div style={{ marginTop: 8 }}>
-                      {items.map((item, idx) => (
-                        <Tag key={idx} color="geekblue" style={{ margin: 4 }}>
-                          {item}
-                        </Tag>
-                      ))}
-                    </div>
+      {/* 右侧：结果区 */}
+      <Col xs={24} lg={14} style={{ height: '100%', overflowY: 'auto' }}>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          {/* 实体卡片 */}
+          <Card 
+            title={<span style={{ color: '#f1f5f9' }}>识别实体 (NER)</span>}
+            className={loading ? 'loading-blur' : ''}
+            style={{
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              border: '1px solid #334155',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            {Object.keys(result.entities).length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>
+                <BulbOutlined style={{ fontSize: 40, marginBottom: 12, opacity: 0.5 }} />
+                <div>等待分析...</div>
+              </div>
+            ) : (
+              Object.entries(result.entities).map(([type, items]) => items.length > 0 && (
+                <div key={type} style={{ marginBottom: 20 }}>
+                  <Text 
+                    style={{ 
+                      display: 'block', 
+                      marginBottom: 10, 
+                      fontSize: 12, 
+                      textTransform: 'uppercase',
+                      color: '#94a3b8',
+                      fontWeight: 600,
+                      letterSpacing: '0.05em'
+                    }}
+                  >
+                    {type}
+                  </Text>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {items.map((item, i) => (
+                      <Tag 
+                        key={i} 
+                        color={getEntityColor(type)} 
+                        style={{ 
+                          fontSize: 14, 
+                          padding: '6px 14px',
+                          borderRadius: 6,
+                          fontWeight: 500
+                        }}
+                      >
+                        {item}
+                      </Tag>
+                    ))}
                   </div>
-                )
-              ))}
-            </Space>
+                </div>
+              ))
+            )}
           </Card>
-        )}
 
-        {relations.length > 0 && (
-          <Card title="提取的关系">
-            <Table 
-              columns={relationColumns} 
-              dataSource={relations.map((r, idx) => ({ ...r, key: idx }))}
-              pagination={{ pageSize: 10 }}
-            />
+          {/* 关系卡片 */}
+          <Card 
+            title={<span style={{ color: '#f1f5f9' }}>关系链 (Relation Extraction)</span>}
+            style={{
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              border: '1px solid #334155',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+            }}
+            extra={
+              <Button 
+                type="primary" 
+                ghost 
+                size="small" 
+                icon={<SaveOutlined />} 
+                disabled={result.relations.length === 0} 
+                onClick={handleSave}
+                style={{ 
+                  borderColor: '#6366f1', 
+                  color: result.relations.length === 0 ? '#64748b' : '#6366f1' 
+                }}
+              >
+                保存到图谱
+              </Button>
+            }
+          >
+            {result.relations.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#64748b', padding: '30px 0' }}>
+                <SaveOutlined style={{ fontSize: 40, marginBottom: 12, opacity: 0.5 }} />
+                <div>无关系数据</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {result.relations.map((rel, idx) => (
+                  <div key={idx} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    background: '#0f172a', 
+                    padding: '16px 18px', 
+                    borderRadius: 10, 
+                    border: '1px solid #334155',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                      <Text strong style={{ color: '#f1f5f9', fontSize: 15 }}>{rel.subject}</Text>
+                      <div style={{ position: 'relative', padding: '0 16px', minWidth: 60 }}>
+                        <div style={{ height: 2, width: 50, background: '#475569', borderRadius: 1 }}></div>
+                        <Text style={{ 
+                          position: 'absolute', 
+                          top: -12, 
+                          left: '50%', 
+                          transform: 'translateX(-50%)', 
+                          fontSize: 12, 
+                          color: '#6366f1', 
+                          background: '#0f172a', 
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {rel.relation}
+                        </Text>
+                      </div>
+                      <Text strong style={{ color: '#f1f5f9', fontSize: 15 }}>{rel.object}</Text>
+                    </div>
+                    <Tag 
+                      color="gold" 
+                      style={{ 
+                        marginLeft: 16,
+                        fontSize: 13,
+                        padding: '4px 12px',
+                        borderRadius: 6,
+                        fontWeight: 600
+                      }}
+                    >
+                      {(rel.confidence * 100).toFixed(0)}%
+                    </Tag>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
-        )}
-      </Spin>
-    </div>
+        </Space>
+      </Col>
+    </Row>
   )
-}
-
-const getCategoryLabel = (category) => {
-  const labels = {
-    companies: '企业',
-    products: '产品',
-    technologies: '技术',
-    persons: '人物',
-    locations: '地点',
-    organizations: '组织'
-  }
-  return labels[category] || category
 }
 
 export default AnalysisPage
