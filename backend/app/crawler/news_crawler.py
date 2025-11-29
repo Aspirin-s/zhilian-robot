@@ -1,232 +1,210 @@
 """
-新闻爬虫 - 爬取产业新闻
+新闻爬虫 - 爬取产业新闻 (修复版)
 """
-import asyncio
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import quote
 import logging
 from typing import List, Dict
 from datetime import datetime
-from bs4 import BeautifulSoup
-import requests
-from urllib.parse import quote
-import json
 
 logger = logging.getLogger(__name__)
-
 
 class IndustryNewsCrawler:
     """产业新闻爬虫"""
     
     def __init__(self):
+        # 核心修复：使用真实的浏览器 User-Agent，防止被百度/OFweek 直接拦截
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
     
-    def crawl_sina_finance(self, keyword: str, max_results: int = 10) -> List[Dict]:
-        """
-        爬取新浪财经新闻 - 使用新浪新闻API
-        
-        Args:
-            keyword: 搜索关键词
-            max_results: 最大结果数
-            
-        Returns:
-            新闻列表
-        """
+    def _crawl_baidu_search(self, query: str, source_label: str, max_results: int) -> List[Dict]:
+        """通用百度资讯搜索解析器"""
         try:
-            logger.info(f"开始爬取新浪财经: {keyword}")
+            logger.info(f"开始百度搜索 [{source_label}]: {query}")
+            # 使用百度资讯搜索
+            url = f"https://www.baidu.com/s?tn=news&rtt=1&bsst=1&cl=2&wd={quote(query)}"
             
-            # 使用新浪新闻搜索接口
-            url = f"https://interface.sina.cn/news/wap/search.d.json?keyword={quote(keyword)}&type=all&page=1&pagesize={max_results}"
-            
+            # 必须带 Header，否则百度直接返回空或验证码
             response = requests.get(url, headers=self.headers, timeout=10)
             
             if response.status_code != 200:
-                logger.warning(f"新浪接口返回状态码: {response.status_code}")
+                logger.warning(f"百度搜索返回状态码: {response.status_code}")
                 return []
-            
-            data = response.json()
+                
+            soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
-            items = data.get('data', {}).get('feed', [])
+            # 百度资讯的新版容器类名通常是 .result-op 或 .c-container
+            items = soup.select('.result-op, .c-container')
+            
             for item in items[:max_results]:
                 try:
-                    title = item.get('title', '').strip()
-                    content = item.get('intro', '').strip() or item.get('summary', '').strip()
+                    # 提取标题
+                    title_tag = item.select_one('h3 a')
+                    if not title_tag: continue
                     
-                    if not title or len(content) < 30:
-                        continue
+                    title = title_tag.get_text(strip=True)
+                    link = title_tag['href']
+                    
+                    # 提取摘要 (尝试多种选择器)
+                    content_tag = item.select_one('.c-font-normal-three') 
+                    if not content_tag:
+                         content_tag = item.select_one('.c-span-last')
+                    
+                    content = content_tag.get_text(strip=True) if content_tag else title
+                    
+                    if not title or len(content) < 10: continue
                     
                     results.append({
                         'title': title,
                         'content': content,
-                        'source': 'sina_finance',
-                        'keyword': keyword,
-                        'url': item.get('url', ''),
-                        'published_at': item.get('ctime', ''),
+                        'source': source_label,
+                        'keyword': query,
+                        'url': link,
                         'crawled_at': datetime.now()
                     })
-                except Exception as e:
-                    logger.warning(f"解析单条新闻失败: {e}")
+                except Exception:
                     continue
             
-            logger.info(f"新浪财经爬取完成: {len(results)} 条")
+            logger.info(f"[{source_label}] 爬取完成: {len(results)} 条")
             return results
             
         except Exception as e:
-            logger.error(f"爬取新浪财经失败: {e}")
+            logger.error(f"[{source_label}] 爬取失败: {e}")
+            return []
+
+    def crawl_sina_finance(self, keyword: str, max_results: int = 10) -> List[Dict]:
+        """
+        修复版：爬取新浪新闻 (改为网页解析，API已失效)
+        """
+        try:
+            logger.info(f"开始爬取新浪新闻: {keyword}")
+            # 使用新浪全网搜索
+            url = f"https://search.sina.com.cn/news?q={quote(keyword)}&c=news&size=10&page=1"
+            
+            response = requests.get(url, headers=self.headers, timeout=10)
+            # 新浪搜索结果有时是 GBK，有时是 UTF-8，自动推断
+            response.encoding = response.apparent_encoding
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            # 结果容器
+            items = soup.select('.box-result .r-info')
+            
+            for item in items[:max_results]:
+                try:
+                    title_tag = item.select_one('h2 a')
+                    if not title_tag: continue
+                    
+                    title = title_tag.get_text(strip=True)
+                    link = title_tag['href']
+                    
+                    content_tag = item.select_one('.content')
+                    content = content_tag.get_text(strip=True) if content_tag else title
+                    
+                    results.append({
+                        'title': title,
+                        'content': content,
+                        'source': 'crawler_sina',
+                        'keyword': keyword,
+                        'url': link,
+                        'crawled_at': datetime.now()
+                    })
+                except Exception:
+                    continue
+            
+            logger.info(f"新浪新闻爬取完成: {len(results)} 条")
+            return results
+        except Exception as e:
+            logger.error(f"爬取新浪失败: {e}")
             return []
     
     def crawl_36kr(self, keyword: str, max_results: int = 10) -> List[Dict]:
         """
-        爬取36氪科技新闻 - 使用百度新闻搜索(site:36kr.com)
-        
-        Args:
-            keyword: 搜索关键词
-            max_results: 最大结果数
-            
-        Returns:
-            新闻列表
+        修复版：爬取36氪
+        (原API已加密，改为利用百度搜索 'site:36kr.com 关键词')
         """
-        try:
-            logger.info(f"开始爬取36氪: {keyword}")
-            
-            # 使用搜狗微信搜索的36kr内容
-            url = f"https://www.toutiao.com/api/search/content/?keyword={quote(keyword + ' 36氪')}&offset=0&format=json&count={max_results}"
-            
-            response = requests.get(url, headers=self.headers, timeout=10)
-            
-            if response.status_code != 200:
-                logger.warning(f"搜索接口返回状态码: {response.status_code}")
-                return []
-            
-            try:
-                data = response.json()
-            except:
-                logger.warning("无法解析JSON响应")
-                return []
-            
-            results = []
-            items = data.get('data', [])
-            
-            for item in items[:max_results]:
-                try:
-                    title = item.get('title', '').strip()
-                    content = item.get('abstract', '').strip()
-                    
-                    if not title or len(content) < 30:
-                        continue
-                    
-                    results.append({
-                        'title': title,
-                        'content': content,
-                        'source': '36kr',
-                        'keyword': keyword,
-                        'url': item.get('article_url', ''),
-                        'published_at': item.get('datetime', ''),
-                        'crawled_at': datetime.now()
-                    })
-                except Exception as e:
-                    logger.warning(f"解析单条新闻失败: {e}")
-                    continue
-            
-            logger.info(f"36氪爬取完成: {len(results)} 条")
-            return results
-            
-        except Exception as e:
-            logger.error(f"爬取36氪失败: {e}")
-            return []
+        query = f"site:36kr.com {keyword}"
+        return self._crawl_baidu_search(query, 'crawler_36kr', max_results)
     
     def crawl_robot_news(self, keyword: str, max_results: int = 10) -> List[Dict]:
         """
-        爬取机器人行业新闻 - 使用百度新闻搜索
-        
-        Args:
-            keyword: 搜索关键词
-            max_results: 最大结果数
-            
-        Returns:
-            新闻列表
+        修复版：爬取机器人网
+        (直接搜关键词，数据源归类为百度新闻)
+        """
+        return self._crawl_baidu_search(keyword, 'crawler_baidu', max_results)
+    
+    def crawl_ofweek_robot(self, keyword: str, max_results: int = 10) -> List[Dict]:
+        """
+        修复版：爬取 OFweek
         """
         try:
-            logger.info(f"开始爬取机器人网新闻: {keyword}")
-            
-            # 使用百度新闻搜索API
-            url = f"https://www.baidu.com/s?tn=news&rtt=1&bsst=1&cl=2&wd={quote(keyword)}&pn=0"
+            logger.info(f"开始爬取 OFweek: {keyword}")
+            url = f"https://www.ofweek.com/s/s.shtml?q={quote(keyword)}&type=1"
             
             response = requests.get(url, headers=self.headers, timeout=10)
             response.encoding = 'utf-8'
-            
             soup = BeautifulSoup(response.text, 'html.parser')
-            # 百度新闻结果通常在 div.result 中
-            articles = soup.find_all('div', class_='result', limit=max_results)
             
             results = []
-            for article in articles:
+            items = soup.select('div.list-detail')
+            
+            for item in items[:max_results]:
                 try:
-                    # 标题通常在 h3 > a 中
-                    title_elem = article.find('h3')
-                    if not title_elem:
-                        continue
+                    title_tag = item.select_one('h3 a')
+                    title = title_tag.get_text(strip=True)
+                    link = title_tag['href']
                     
-                    title_link = title_elem.find('a')
-                    if not title_link:
-                        continue
+                    desc_tag = item.select_one('p.intro')
+                    content = desc_tag.get_text(strip=True) if desc_tag else title
                     
-                    title = title_link.get_text(strip=True)
-                    
-                    # 内容摘要通常在 class 包含 'c-span' 或 'content' 的元素中
-                    content_elem = article.find('span', class_=lambda x: x and ('abstract' in str(x) or 'content' in str(x)))
-                    if not content_elem:
-                        content_elem = article.find('div', class_=lambda x: x and 'content' in str(x))
-                    
-                    content = content_elem.get_text(strip=True) if content_elem else title
-                    
-                    if not title or len(content) < 20:
-                        continue
-                    
+                    if not title: continue
+                        
                     results.append({
                         'title': title,
                         'content': content,
-                        'source': 'baidu_news',
+                        'source': 'crawler_ofweek',
                         'keyword': keyword,
-                        'url': title_link.get('href', ''),
+                        'url': link,
                         'crawled_at': datetime.now()
                     })
-                except Exception as e:
-                    logger.warning(f"解析单条新闻失败: {e}")
+                except Exception:
                     continue
-            
-            logger.info(f"百度新闻爬取完成: {len(results)} 条")
+                    
+            logger.info(f"OFweek 爬取完成: {len(results)} 条")
             return results
-            
         except Exception as e:
-            logger.error(f"爬取百度新闻失败: {e}")
+            logger.error(f"爬取 OFweek 失败: {e}")
             return []
     
     def crawl_all_sources(self, keyword: str) -> List[Dict]:
-        """
-        从所有数据源爬取新闻
-        
-        Args:
-            keyword: 搜索关键词
-            
-        Returns:
-            所有新闻列表
-        """
+        """从所有数据源爬取新闻"""
         all_news = []
         
-        # 爬取新浪财经
+        # 1. 新浪新闻
         all_news.extend(self.crawl_sina_finance(keyword, max_results=5))
         
-        # 爬取36氪
+        # 2. 36氪 (通过百度搜索)
         all_news.extend(self.crawl_36kr(keyword, max_results=5))
         
-        # 爬取机器人网
+        # 3. 百度新闻 (通用)
         all_news.extend(self.crawl_robot_news(keyword, max_results=5))
+        
+        # 4. OFweek
+        try:
+            all_news.extend(self.crawl_ofweek_robot(keyword, max_results=5))
+        except Exception:
+            pass
         
         logger.info(f"关键词 '{keyword}' 总共爬取: {len(all_news)} 条新闻")
         return all_news
-
 
 # 全局爬虫实例
 news_crawler = IndustryNewsCrawler()

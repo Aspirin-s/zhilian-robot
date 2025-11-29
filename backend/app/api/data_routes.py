@@ -175,8 +175,8 @@ async def process_articles_batch(request: BatchProcessRequest):
             "success": success_count,
             "failed": failed_count,
             "skipped": skipped_count,
-            "total_entities": total_entities,
-            "total_relations": total_relations,
+            "entities_extracted": total_entities,
+            "relations_extracted": total_relations,
             "errors": errors[:10]  # 只返回前10个错误
         }
         

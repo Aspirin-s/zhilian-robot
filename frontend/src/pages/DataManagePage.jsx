@@ -189,9 +189,16 @@ const DataManagePage = () => {
         try {
           const response = await dataService.batchProcessArticles(selectedRowKeys)
           
+          // 显示实体和关系提取统计
+          const entitiesTotal = response.entities_extracted || 0
+          const relationsTotal = response.relations_extracted || 0
+          const statsMsg = (entitiesTotal > 0 || relationsTotal > 0)
+            ? `，总计提取了 ${entitiesTotal} 个实体和 ${relationsTotal} 个关系`
+            : ''
+
           message.success(
-            `批量处理完成! 成功: ${response.success}, 失败: ${response.failed}, 跳过: ${response.skipped}`,
-            5
+            `批量处理完成! 成功: ${response.success}, 失败: ${response.failed}, 跳过: ${response.skipped}${statsMsg}`,
+            8
           )
           
           setSelectedRowKeys([])
@@ -287,7 +294,11 @@ const DataManagePage = () => {
           'rss_ithome': 'purple',
           'rss_cnbeta': 'cyan',
           'rss_hacker_news': 'red',
-          'rss_reddit': 'magenta'
+          'rss_reddit': 'magenta',
+          'crawler_sina': 'blue',
+          'crawler_36kr': 'green',
+          'crawler_baidu': 'cyan',
+          'crawler_ofweek': 'orange'
         }
         return <Tag color={colorMap[source] || 'default'}>{source}</Tag>
       }
@@ -481,17 +492,9 @@ const DataManagePage = () => {
 
       {/* 操作按钮 */}
       <Card style={{ marginBottom: 24 }}>
-        <Alert 
-          message="数据源说明" 
-          description="RSS订阅是主要稳定数据源(7个科技媒体,每6小时自动更新)。关键词爬取功能当前不稳定,仅作补充使用。" 
-          type="info" 
-          showIcon 
-          style={{ marginBottom: 16 }}
-          closable
-        />
         <Space wrap>
           <Search
-            placeholder="输入关键词(网页爬取不稳定)"
+            placeholder="输入关键词"
             enterButton="开始爬取"
             size="large"
             onSearch={handleCrawlKeyword}

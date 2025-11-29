@@ -165,6 +165,22 @@ const HomePage = () => {
               >
                 文本智能分析
               </Button>
+              <Button 
+                size="large" 
+                style={{ 
+                  height: '44px',
+                  border: '2px solid rgba(236, 72, 153, 0.6)',  // 使用粉色边框区分
+                  background: 'rgba(236, 72, 153, 0.2)',      // 轻微粉色半透明背景
+                  color: 'white',
+                  fontWeight: 600,
+                  backdropFilter: 'blur(10px)',
+                  paddingLeft: '32px',
+                  paddingRight: '32px'
+                }} 
+                onClick={() => navigate('/data')}
+              >
+                进入数据中心
+              </Button>
             </div>
           </Col>
         </Row>

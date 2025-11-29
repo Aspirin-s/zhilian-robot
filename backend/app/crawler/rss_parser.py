@@ -27,8 +27,24 @@ class RSSFeedParser:
             
             # 科技媒体
             'ifanr': 'https://www.ifanr.com/feed',  # 爱范儿
-            'geekpark': 'http://www.geekpark.net/rss',  # 极客公园
+            #有问题'geekpark': 'http://www.geekpark.net/rss',  # 极客公园
             
+            # === 新增专业源 ===
+            # 机器之心 (AI与机器人) - 建议使用 RSSHub 等工具转换的标准链接，或尝试直接解析
+            #有问题'jiqizhixin': 'https://www.jiqizhixin.com/rss',
+            
+            # 雷锋网 (智能驾驶与机器人)
+            'leiphone': 'https://www.leiphone.com/feed',
+            
+            # 智东西 (硬科技)
+            #有问题'zhidx': 'https://zhidx.com/feed',
+            
+            # IEEE Spectrum 机器人 (国际权威，需确保网络可达)
+            #有问题'ieee_robotics': 'https://spectrum.ieee.org/feeds/topic/robotics',
+            
+            # 麻省理工科技评论 (新兴技术)
+            'mit_tech': 'https://www.technologyreview.com/feed/',
+
             # 备注:专业机器人/工控类RSS源多数存在XML格式问题
             # 已测试但无法使用的源:
             # - robot_china: XML entity错误

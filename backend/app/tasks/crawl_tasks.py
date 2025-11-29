@@ -22,14 +22,19 @@ def crawl_all_news(self):
     
     # 预定义关键词
     keywords = [
-        "工业机器人",
-        "华为",
-        "ABB机器人",
-        "库卡机器人",
-        "发那科",
-        "安川电机",
-        "机器人产业链",
-        "智能制造"
+        # === 核心零部件 (上游) ===
+        "精密减速器", "RV减速器", "谐波减速器",
+        "伺服电机", "伺服驱动器", "运动控制器",
+        "机器视觉传感器", "激光雷达 LiDAR", "六维力传感器",
+        
+        # === 本体制造 (中游) ===
+        "工业机器人", "协作机器人", "SCARA机器人", "Delta机器人",
+        "人形机器人", "具身智能", "AGV", "AMR",
+        "发那科", "ABB", "安川电机", "库卡", "埃斯顿", "汇川技术", # 龙头企业
+        
+        # === 系统集成与应用 (下游) ===
+        "焊接机器人", "码垛机器人", "喷涂机器人",
+        "黑灯工厂", "智能产线", "柔性制造"
     ]
     
     total_processed = 0
@@ -67,7 +72,8 @@ def crawl_all_news(self):
                         'entities': entities,
                         'relations': relations,
                         'crawled_at': article.get('crawled_at', datetime.now()),
-                        'processed_at': datetime.now()
+                        'processed_at': datetime.now(),
+                        'processed': True
                     }
                     
                     mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
@@ -150,7 +156,8 @@ def fetch_rss_updates(self):
                     'relations': relations,
                     'published_at': article.get('published_at'),
                     'crawled_at': article.get('crawled_at', datetime.now()),
-                    'processed_at': datetime.now()
+                    'processed_at': datetime.now(),
+                    'processed': True
                 }
                 
                 mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
@@ -192,16 +199,17 @@ def fetch_rss_updates(self):
 @shared_task(name='app.tasks.crawl_tasks.crawl_single_keyword')
 def crawl_single_keyword(keyword: str):
     """
-    爬取单个关键词的新闻(手动触发)
-    
-    Args:
-        keyword: 搜索关键词
+    爬取单个关键词的新闻(手动触发) - 修复版：增加历史记录
     """
     logger.info(f"🔍 手动爬取: {keyword}")
     
+    # 初始化统计变量
+    processed_count = 0
+    total_entities = 0
+    total_relations = 0
+    
     try:
         articles = news_crawler.crawl_all_sources(keyword)
-        processed_count = 0
         
         for article in articles:
             try:
@@ -209,7 +217,11 @@ def crawl_single_keyword(keyword: str):
                 entities = result.get('entities', {})
                 relations = result.get('relations', [])
                 
-                graph_service.save_analyzed_data(entities, relations)
+                # 保存图谱并获取统计数据
+                save_result = graph_service.save_analyzed_data(entities, relations)
+                if save_result.get('success'):
+                    total_entities += save_result.get('entities_count', 0)
+                    total_relations += save_result.get('relations_count', 0)
                 
                 article_doc = {
                     'title': article['title'],
@@ -220,7 +232,8 @@ def crawl_single_keyword(keyword: str):
                     'entities': entities,
                     'relations': relations,
                     'crawled_at': article.get('crawled_at', datetime.now()),
-                    'processed_at': datetime.now()
+                    'processed_at': datetime.now(),
+                    'processed': True  # 确保状态为已处理
                 }
                 
                 mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
@@ -230,15 +243,33 @@ def crawl_single_keyword(keyword: str):
                 logger.error(f"处理文章失败: {e}")
                 continue
         
+        # === 新增：构造任务总结并保存到数据库 ===
+        summary = {
+            'task': 'crawl_single_keyword',
+            'status': 'completed',
+            'keyword': keyword,  # 记录具体的关键词
+            'articles_processed': processed_count,
+            'entities_extracted': total_entities,
+            'relations_extracted': total_relations,
+            'completed_at': datetime.now()
+        }
+        mongodb_conn.get_collection('task_history').insert_one(summary)
+        # ======================================
+
         logger.info(f"✅ 关键词 '{keyword}' 处理完成: {processed_count} 篇文章")
         
-        # 返回可JSON序列化的结果
-        return {
-            'keyword': keyword,
-            'articles_processed': processed_count,
-            'status': 'completed'
-        }
+        # 返回结果 (移除 ObjectId 以免 JSON 序列化报错)
+        summary.pop('_id', None)
+        return summary
         
     except Exception as e:
         logger.error(f"爬取失败: {e}", exc_info=True)
+        # 记录失败的任务历史
+        mongodb_conn.get_collection('task_history').insert_one({
+            'task': 'crawl_single_keyword',
+            'status': 'failed',
+            'keyword': keyword,
+            'error': str(e),
+            'completed_at': datetime.now()
+        })
         raise
