@@ -7,12 +7,13 @@ import HomePage from './pages/HomePage'
 import GraphPage from './pages/GraphPage'
 import AnalysisPage from './pages/AnalysisPage'
 import DataManagePage from './pages/DataManagePage'
+import TemporalAnalysisPage from './pages/TemporalAnalysisPage'
 
-// 自定义深色主题配�?
+// 自定义深色主题配�?
 const themeConfig = {
   algorithm: theme.darkAlgorithm, // 启用深色算法
   token: {
-    colorPrimary: '#6366f1', // 靛蓝�?
+    colorPrimary: '#6366f1', // 靛蓝�?
     colorInfo: '#3b82f6',
     colorSuccess: '#22c55e',
     colorWarning: '#f59e0b',
@@ -67,6 +68,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/graph" element={<GraphPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
+              <Route path="/temporal" element={<TemporalAnalysisPage />} />
               <Route path="/data" element={<DataManagePage />} />
             </Routes>
           </Layout>

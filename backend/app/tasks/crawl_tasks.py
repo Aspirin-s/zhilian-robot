@@ -76,7 +76,31 @@ def crawl_all_news(self):
                         'processed': True
                     }
                     
-                    mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
+                    result = mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
+                    article_id = str(result.inserted_id)
+                    
+                    # 创建文档实例
+                    from app.database.mongodb import document_instance_manager
+                    entity_references = []
+                    for category, items in entities.items():
+                        # Use lowercase category to match MongoDB entity IDs
+                        for item_name in items:
+                            entity_id = f"CANONICAL_{category}_{item_name}"
+                            entity_references.append({
+                                'entity_id': entity_id,
+                                'entity_name': item_name,
+                                'entity_type': category
+                            })
+                    
+                    if entity_references:
+                        document_instance_manager.save_document_instance(
+                            source_id=article['source'],
+                            title=article['title'],
+                            content=article.get('content', ''),
+                            extracted_time=article.get('crawled_at', datetime.now()),
+                            entity_references=entity_references
+                        )
+                    
                     total_processed += 1
                     
                     logger.info(f"✅ 处理成功: {article['title'][:50]}...")
@@ -88,15 +112,18 @@ def crawl_all_news(self):
         summary = {
             'task': 'crawl_all_news',
             'status': 'completed',
-            'keywords': keywords,
+            'keywords_count': len(keywords),
             'articles_processed': total_processed,
             'entities_extracted': total_entities,
             'relations_extracted': total_relations,
-            'completed_at': datetime.now()
+            'completed_at': datetime.now().isoformat()
         }
         
-        # 保存任务执行记录
-        mongodb_conn.get_collection('task_history').insert_one(summary)
+        # 保存任务执行记录（保存到MongoDB时使用datetime对象）
+        mongodb_summary = summary.copy()
+        mongodb_summary['completed_at'] = datetime.now()
+        mongodb_summary['keywords'] = keywords
+        mongodb_conn.get_collection('task_history').insert_one(mongodb_summary)
         
         logger.info(f"🎉 任务完成! 处理 {total_processed} 篇文章, "
                    f"提取 {total_entities} 个实体, {total_relations} 个关系")
@@ -123,17 +150,48 @@ def fetch_rss_updates(self):
         # 1. 解析所有RSS源
         articles = rss_parser.parse_all_feeds()
         
-        for article in articles:
+        if not articles:
+            logger.info("📭 没有获取到新文章")
+            return {
+                'task': 'fetch_rss_updates',
+                'status': 'completed',
+                'articles_processed': 0,
+                'entities_extracted': 0,
+                'relations_extracted': 0
+            }
+        
+        # 2. 批量检查已存在的URL（优化：一次查询代替N次）
+        article_urls = [article['url'] for article in articles if article.get('url')]
+        existing_urls = set()
+        if article_urls:
+            existing_docs = mongodb_conn.get_collection('crawled_articles').find(
+                {'url': {'$in': article_urls}},
+                {'url': 1}
+            )
+            existing_urls = {doc['url'] for doc in existing_docs}
+        
+        # 3. 过滤出新文章
+        new_articles = [article for article in articles if article.get('url') not in existing_urls]
+        
+        skipped_count = len(articles) - len(new_articles)
+        if skipped_count > 0:
+            logger.info(f"⏭️ 跳过 {skipped_count} 篇已处理文章")
+        
+        if not new_articles:
+            logger.info("✅ 所有文章均已处理，无需更新")
+            return {
+                'task': 'fetch_rss_updates',
+                'status': 'completed',
+                'articles_processed': 0,
+                'entities_extracted': 0,
+                'relations_extracted': 0
+            }
+        
+        logger.info(f"📝 发现 {len(new_articles)} 篇新文章，开始处理...")
+        
+        # 4. 处理新文章
+        for article in new_articles:
             try:
-                # 检查是否已处理过(通过URL去重)
-                existing = mongodb_conn.get_collection('crawled_articles').find_one({
-                    'url': article['url']
-                })
-                
-                if existing:
-                    logger.info(f"⏭️ 跳过已处理文章: {article['title'][:50]}")
-                    continue
-                
                 # 2. 提取实体和关系
                 result = llm_processor.analyze_industry_chain(article['content'])
                 entities = result.get('entities', {})
@@ -160,7 +218,33 @@ def fetch_rss_updates(self):
                     'processed': True
                 }
                 
-                mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
+                result = mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
+                article_id = str(result.inserted_id)
+                
+                # 5. 创建文档实例（用于动量计算）
+                from app.database.mongodb import document_instance_manager
+                
+                # 构建实体引用列表
+                entity_references = []
+                for category, items in entities.items():
+                    # Use lowercase category to match MongoDB entity IDs
+                    for item_name in items:
+                        entity_id = f"CANONICAL_{category}_{item_name}"
+                        entity_references.append({
+                            'entity_id': entity_id,
+                            'entity_name': item_name,
+                            'entity_type': category
+                        })
+                
+                if entity_references:
+                    document_instance_manager.save_document_instance(
+                        source_id=article['source'],
+                        title=article['title'],
+                        content=article.get('content', ''),
+                        extracted_time=article.get('published_at', datetime.now()),
+                        entity_references=entity_references
+                    )
+                
                 total_processed += 1
                 
                 logger.info(f"✅ RSS文章处理成功: {article['title'][:50]}...")
@@ -236,7 +320,31 @@ def crawl_single_keyword(keyword: str):
                     'processed': True  # 确保状态为已处理
                 }
                 
-                mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
+                result = mongodb_conn.get_collection('crawled_articles').insert_one(article_doc)
+                article_id = str(result.inserted_id)
+                
+                # 创建文档实例
+                from app.database.mongodb import document_instance_manager
+                entity_references = []
+                for category, items in entities.items():
+                    # Use lowercase category to match MongoDB entity IDs
+                    for item_name in items:
+                        entity_id = f"CANONICAL_{category}_{item_name}"
+                        entity_references.append({
+                            'entity_id': entity_id,
+                            'entity_name': item_name,
+                            'entity_type': category
+                        })
+                
+                if entity_references:
+                    document_instance_manager.save_document_instance(
+                        source_id=article['source'],
+                        title=article['title'],
+                        content=article.get('content', ''),
+                        extracted_time=article.get('crawled_at', datetime.now()),
+                        entity_references=entity_references
+                    )
+                
                 processed_count += 1
                 
             except Exception as e:
@@ -258,9 +366,16 @@ def crawl_single_keyword(keyword: str):
 
         logger.info(f"✅ 关键词 '{keyword}' 处理完成: {processed_count} 篇文章")
         
-        # 返回结果 (移除 ObjectId 以免 JSON 序列化报错)
-        summary.pop('_id', None)
-        return summary
+        # 返回结果 (JSON可序列化版本)
+        return {
+            'task': 'crawl_single_keyword',
+            'status': 'completed',
+            'keyword': keyword,
+            'articles_processed': processed_count,
+            'entities_extracted': total_entities,
+            'relations_extracted': total_relations,
+            'completed_at': datetime.now().isoformat()
+        }
         
     except Exception as e:
         logger.error(f"爬取失败: {e}", exc_info=True)
@@ -272,4 +387,11 @@ def crawl_single_keyword(keyword: str):
             'error': str(e),
             'completed_at': datetime.now()
         })
-        raise
+        # 返回JSON可序列化的错误信息
+        return {
+            'task': 'crawl_single_keyword',
+            'status': 'failed',
+            'keyword': keyword,
+            'error': str(e),
+            'completed_at': datetime.now().isoformat()
+        }

@@ -123,3 +123,58 @@ export const dataService = {
     return apiClient.get('/api/v1/data/tasks/history', { params })
   }
 }
+
+// 实体操作相关API
+export const entityActionsService = {
+  // 添加到监控
+  addToMonitor: (entityData) => {
+    return apiClient.post('/api/v1/entity-actions/monitor/add', entityData)
+  },
+
+  // 从监控移除
+  removeFromMonitor: (entityId) => {
+    return apiClient.delete(`/api/v1/entity-actions/monitor/remove/${entityId}`)
+  },
+
+  // 获取监控列表
+  getMonitorList: () => {
+    return apiClient.get('/api/v1/entity-actions/monitor/list')
+  },
+
+  // 研判溯源
+  investigate: (entityId, depth = 2) => {
+    return apiClient.post('/api/v1/entity-actions/investigate', {
+      entity_id: entityId,
+      depth: depth
+    })
+  },
+
+  // 生成AI简报
+  generateReport: (entityId) => {
+    return apiClient.post('/api/v1/entity-actions/generate-report', {
+      entity_id: entityId
+    })
+  },
+
+  // 导出原始数据
+  exportData: (entityId) => {
+    return apiClient.post('/api/v1/entity-actions/export-data', {
+      entity_id: entityId
+    })
+  },
+
+  // 屏蔽实体
+  hideEntity: (entityId) => {
+    return apiClient.post('/api/v1/entity-actions/hide-entity', {
+      entity_id: entityId
+    })
+  }
+}
+
+// 默认导出所有服务
+export default {
+  nlp: nlpService,
+  graph: graphService,
+  data: dataService,
+  entityActions: entityActionsService
+}

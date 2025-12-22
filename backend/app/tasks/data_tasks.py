@@ -99,3 +99,124 @@ def get_crawl_statistics():
     except Exception as e:
         logger.error(f"获取统计信息失败: {e}")
         return {}
+
+
+@shared_task(name='app.tasks.data_tasks.update_all_entity_momentum')
+def update_all_entity_momentum():
+    """
+    更新所有实体的动量值（定时任务）
+    """
+    logger.info("📊 开始更新所有实体动量")
+    
+    try:
+        from app.analytics.momentum import momentum_engine
+        from datetime import datetime
+        
+        # 批量更新动量
+        result = momentum_engine.update_all_momentum()
+        
+        logger.info(f"✅ 动量更新完成: {result.get('updated_count')} 个实体")
+        
+        # 记录任务执行
+        mongodb_conn.get_collection('task_history').insert_one({
+            'task': 'update_all_entity_momentum',
+            'status': 'completed',
+            'updated_count': result.get('updated_count'),
+            'completed_at': datetime.now()
+        })
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ 动量更新失败: {e}", exc_info=True)
+        raise
+
+
+@shared_task(name='app.tasks.data_tasks.merge_duplicate_entities')
+def merge_duplicate_entities():
+    """
+    合并重复的实体（手动触发）
+    """
+    logger.info("🔄 开始合并重复实体")
+    
+    try:
+        from collections import defaultdict
+        
+        # 获取所有实体
+        all_entities = list(mongodb_conn.find_many('canonical_entities', {}))
+        
+        # 按名称分组
+        name_to_entities = defaultdict(list)
+        for entity in all_entities:
+            names = entity.get('names', [])
+            if names:
+                primary_name = names[0]
+                name_to_entities[primary_name].append(entity)
+        
+        # 查找重复项
+        merged_count = 0
+        deleted_count = 0
+        
+        for name, entities in name_to_entities.items():
+            if len(entities) <= 1:
+                continue
+            
+            # 按动量排序，保留动量最高的
+            entities.sort(key=lambda e: e.get('current_momentum', 0), reverse=True)
+            primary = entities[0]
+            duplicates = entities[1:]
+            
+            logger.info(f"合并重复实体: {name} ({len(entities)} 个)")
+            
+            # 合并引用计数和其他信息
+            total_refs = sum(e.get('reference_count', 0) for e in entities)
+            all_names = set()
+            for e in entities:
+                all_names.update(e.get('names', []))
+            
+            # 更新主实体
+            mongodb_conn.get_collection('canonical_entities').update_one(
+                {'_id': primary['_id']},
+                {'$set': {
+                    'reference_count': total_refs,
+                    'names': list(all_names),
+                    'merged_from': [e['_id'] for e in duplicates],
+                    'merged_at': datetime.now()
+                }}
+            )
+            
+            # 更新文档引用
+            for dup in duplicates:
+                # 将引用从重复实体改为主实体
+                mongodb_conn.get_collection('document_instances').update_many(
+                    {'entity_references.entity_id': dup['_id']},
+                    {'$set': {'entity_references.$.entity_id': primary['_id']}}
+                )
+                
+                # 删除重复实体
+                mongodb_conn.get_collection('canonical_entities').delete_one(
+                    {'_id': dup['_id']}
+                )
+                deleted_count += 1
+            
+            merged_count += 1
+        
+        logger.info(f"✅ 实体去重完成: 合并了 {merged_count} 组重复实体，删除了 {deleted_count} 个重复项")
+        
+        # 记录任务执行
+        mongodb_conn.get_collection('task_history').insert_one({
+            'task': 'merge_duplicate_entities',
+            'status': 'completed',
+            'merged_count': merged_count,
+            'deleted_count': deleted_count,
+            'completed_at': datetime.now()
+        })
+        
+        return {
+            'merged_count': merged_count,
+            'deleted_count': deleted_count
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ 实体去重失败: {e}", exc_info=True)
+        raise

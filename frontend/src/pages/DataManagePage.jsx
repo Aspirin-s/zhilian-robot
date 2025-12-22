@@ -91,9 +91,27 @@ const DataManagePage = () => {
   }
 
   useEffect(() => {
+    // 优先加载统计数据
     loadStatistics()
-    loadArticles()
-    loadTaskHistory()
+    
+    // 延迟加载文章列表和任务历史，避免并发请求过多
+    const timer1 = setTimeout(() => {
+      if (activeTab === 'articles') {
+        loadArticles()
+      }
+    }, 100)
+    
+    const timer2 = setTimeout(() => {
+      if (activeTab === 'tasks') {
+        loadTaskHistory()
+      }
+    }, 200)
+    
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 手动触发关键词爬取

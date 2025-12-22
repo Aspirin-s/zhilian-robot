@@ -260,10 +260,24 @@ async def process_article(article_id: str, background_tasks: BackgroundTasks):
 @router.get("/statistics")
 async def get_statistics():
     """
-    获取爬取统计信息
+    获取爬取统计信息（优化版，使用缓存）
     """
     try:
+        from app.database.redis_db import redis_conn
+        
+        # 尝试从缓存获取
+        cache_key = "data:statistics"
+        cached_stats = redis_conn.get(cache_key)
+        if cached_stats:
+            logger.info("返回缓存的数据统计")
+            return cached_stats
+        
+        # 缓存未命中，查询数据库
         stats = get_crawl_statistics()
+        
+        # 缓存3分钟
+        redis_conn.set(cache_key, stats, expire=180)
+        
         return stats
     except Exception as e:
         logger.error(f"获取统计信息失败: {e}")
@@ -273,7 +287,7 @@ async def get_statistics():
 @router.get("/articles")
 async def get_recent_articles(limit: int = 20, skip: int = 0):
     """
-    获取最近爬取的文章
+    获取最近爬取的文章（优化版，只返回必要字段）
     
     Args:
         limit: 返回数量
@@ -282,8 +296,21 @@ async def get_recent_articles(limit: int = 20, skip: int = 0):
     try:
         collection = mongodb_conn.get_collection('crawled_articles')
         
+        # 只查询必要的字段，减少数据传输
+        projection = {
+            '_id': 1,
+            'title': 1,
+            'source': 1,
+            'url': 1,
+            'crawled_at': 1,
+            'processed': 1,
+            'processed_at': 1,
+            'entities_count': 1,
+            'relations_count': 1
+        }
+        
         articles = list(
-            collection.find()
+            collection.find({}, projection)
             .sort('crawled_at', -1)
             .skip(skip)
             .limit(limit)
@@ -297,9 +324,12 @@ async def get_recent_articles(limit: int = 20, skip: int = 0):
             if 'processed_at' in article:
                 article['processed_at'] = article['processed_at'].isoformat()
         
+        # 使用count_documents的estimated版本提高性能
+        total = collection.estimated_document_count()
+        
         return {
             "articles": articles,
-            "total": collection.count_documents({}),
+            "total": total,
             "limit": limit,
             "skip": skip
         }
@@ -483,3 +513,50 @@ async def get_data_sources():
     except Exception as e:
         logger.error(f"获取数据源失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/maintenance/merge-duplicates")
+async def merge_duplicate_entities():
+    """
+    合并重复的实体（手动触发）
+    """
+    try:
+        logger.info("收到合并重复实体请求")
+        
+        from app.tasks.data_tasks import merge_duplicate_entities as merge_task
+        
+        # 使用Celery异步任务
+        task = merge_task.delay()
+        
+        return {
+            "message": "实体去重任务已启动",
+            "task_id": task.id,
+            "status": "running"
+        }
+    except Exception as e:
+        logger.error(f"启动去重任务失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/maintenance/update-momentum")
+async def update_all_momentum():
+    """
+    手动更新所有实体的动量值
+    """
+    try:
+        logger.info("收到更新动量请求")
+        
+        from app.tasks.data_tasks import update_all_entity_momentum as update_task
+        
+        # 使用Celery异步任务
+        task = update_task.delay()
+        
+        return {
+            "message": "动量更新任务已启动",
+            "task_id": task.id,
+            "status": "running"
+        }
+    except Exception as e:
+        logger.error(f"启动动量更新任务失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

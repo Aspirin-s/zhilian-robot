@@ -150,29 +150,44 @@ class RSSFeedParser:
             logger.error(f"解析RSS源失败 {feed_name}: {e}", exc_info=True)
             return []
     
-    def parse_all_feeds(self, max_entries_per_feed: int = 5) -> List[Dict]:
+    def parse_all_feeds(self, max_entries_per_feed: int = 5, hours_ago: int = 24) -> List[Dict]:
         """
         解析所有预定义的RSS源
         
         Args:
             max_entries_per_feed: 每个源的最大条目数
+            hours_ago: 只获取最近N小时的文章（默认24小时）
             
         Returns:
             所有文章列表
         """
+        from datetime import timedelta
+        
         all_articles = []
+        cutoff_time = datetime.now() - timedelta(hours=hours_ago)
         
         for feed_name, feed_url in self.feeds.items():
             logger.info(f"正在处理RSS源: {feed_name}")
             try:
                 articles = self.parse_feed(feed_name, max_entries=max_entries_per_feed)
-                all_articles.extend(articles)
-                logger.info(f"✅ {feed_name}: 获取 {len(articles)} 条")
+                
+                # 过滤出最近N小时的文章
+                recent_articles = [
+                    article for article in articles 
+                    if article.get('published_at', datetime.min) >= cutoff_time
+                ]
+                
+                all_articles.extend(recent_articles)
+                
+                if len(recent_articles) < len(articles):
+                    logger.info(f"✅ {feed_name}: 获取 {len(recent_articles)} 条 (过滤掉 {len(articles) - len(recent_articles)} 条旧文章)")
+                else:
+                    logger.info(f"✅ {feed_name}: 获取 {len(articles)} 条")
             except Exception as e:
                 logger.error(f"❌ {feed_name} 处理失败: {e}")
                 continue
         
-        logger.info(f"RSS订阅总共获取: {len(all_articles)} 条文章")
+        logger.info(f"RSS订阅总共获取: {len(all_articles)} 条文章 (最近{hours_ago}小时)")
         return all_articles
     
     def add_feed(self, name: str, url: str):

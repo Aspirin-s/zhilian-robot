@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { 
-  Card, Input, Button, message, Spin, Tag, Space, Row, Col, Typography, Divider 
+import {
+  Card, Input, Button, message, Spin, Tag, Space, Row, Col, Typography, Divider
 } from 'antd'
-import { 
-  ThunderboltOutlined, 
-  SaveOutlined, 
+import {
+  ThunderboltOutlined,
+  SaveOutlined,
   ClearOutlined,
   BulbOutlined
 } from '@ant-design/icons'
@@ -60,11 +60,11 @@ const AnalysisPage = () => {
     <Row gutter={24} style={{ height: 'calc(100vh - 120px)' }}>
       {/* 左侧：输入区 */}
       <Col xs={24} lg={10} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Card 
-          title={<Space><ThunderboltOutlined style={{ color: '#6366f1' }}/> <span style={{ color: '#f1f5f9' }}>文本输入</span></Space>} 
-          style={{ 
-            height: '100%', 
-            display: 'flex', 
+        <Card
+          title={<Space><ThunderboltOutlined style={{ color: '#6366f1' }} /> <span style={{ color: '#f1f5f9' }}>文本输入</span></Space>}
+          style={{
+            height: '100%',
+            display: 'flex',
             flexDirection: 'column',
             background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
             border: '1px solid #334155',
@@ -72,9 +72,9 @@ const AnalysisPage = () => {
           }}
           bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column' }}
           extra={
-            <Button 
-              type="link" 
-              size="small" 
+            <Button
+              type="link"
+              size="small"
               onClick={() => setText(sampleText)}
               style={{ color: '#6366f1' }}
             >
@@ -86,34 +86,34 @@ const AnalysisPage = () => {
             value={text}
             onChange={e => setText(e.target.value)}
             placeholder="在此粘贴行业新闻、研报摘要或公司公告..."
-            style={{ 
-              flex: 1, 
-              resize: 'none', 
-              marginBottom: 20, 
-              padding: 14, 
-              fontSize: 15, 
-              background: '#0f172a', 
+            style={{
+              flex: 1,
+              resize: 'none',
+              marginBottom: 20,
+              padding: 14,
+              fontSize: 15,
+              background: '#0f172a',
               border: '1px solid #334155',
               color: '#e2e8f0',
               borderRadius: 8
             }}
           />
           <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-            <Button 
-              icon={<ClearOutlined />} 
-              onClick={() => {setText(''); setResult({entities:{}, relations:[]})}}
-              style={{ 
-                background: '#1e293b', 
-                border: '1px solid #334155', 
-                color: '#94a3b8' 
+            <Button
+              icon={<ClearOutlined />}
+              onClick={() => { setText(''); setResult({ entities: {}, relations: [] }) }}
+              style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                color: '#94a3b8'
               }}
             >
               清空
             </Button>
-            <Button 
-              type="primary" 
-              icon={<BulbOutlined />} 
-              loading={loading} 
+            <Button
+              type="primary"
+              icon={<BulbOutlined />}
+              loading={loading}
               onClick={handleAnalyze}
               style={{ background: '#6366f1', border: 'none' }}
             >
@@ -127,7 +127,7 @@ const AnalysisPage = () => {
       <Col xs={24} lg={14} style={{ height: '100%', overflowY: 'auto' }}>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           {/* 实体卡片 */}
-          <Card 
+          <Card
             title={<span style={{ color: '#f1f5f9' }}>识别实体 (NER)</span>}
             className={loading ? 'loading-blur' : ''}
             style={{
@@ -144,11 +144,11 @@ const AnalysisPage = () => {
             ) : (
               Object.entries(result.entities).map(([type, items]) => items.length > 0 && (
                 <div key={type} style={{ marginBottom: 20 }}>
-                  <Text 
-                    style={{ 
-                      display: 'block', 
-                      marginBottom: 10, 
-                      fontSize: 12, 
+                  <Text
+                    style={{
+                      display: 'block',
+                      marginBottom: 10,
+                      fontSize: 12,
                       textTransform: 'uppercase',
                       color: '#94a3b8',
                       fontWeight: 600,
@@ -159,11 +159,11 @@ const AnalysisPage = () => {
                   </Text>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     {items.map((item, i) => (
-                      <Tag 
-                        key={i} 
-                        color={getEntityColor(type)} 
-                        style={{ 
-                          fontSize: 14, 
+                      <Tag
+                        key={i}
+                        color={getEntityColor(type)}
+                        style={{
+                          fontSize: 14,
                           padding: '6px 14px',
                           borderRadius: 6,
                           fontWeight: 500
@@ -179,7 +179,7 @@ const AnalysisPage = () => {
           </Card>
 
           {/* 关系卡片 */}
-          <Card 
+          <Card
             title={<span style={{ color: '#f1f5f9' }}>关系链 (Relation Extraction)</span>}
             style={{
               background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
@@ -187,16 +187,16 @@ const AnalysisPage = () => {
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
             }}
             extra={
-              <Button 
-                type="primary" 
-                ghost 
-                size="small" 
-                icon={<SaveOutlined />} 
-                disabled={result.relations.length === 0} 
+              <Button
+                type="primary"
+                ghost
+                size="small"
+                icon={<SaveOutlined />}
+                disabled={result.relations.length === 0}
                 onClick={handleSave}
-                style={{ 
-                  borderColor: '#6366f1', 
-                  color: result.relations.length === 0 ? '#64748b' : '#6366f1' 
+                style={{
+                  borderColor: '#6366f1',
+                  color: result.relations.length === 0 ? '#64748b' : '#6366f1'
                 }}
               >
                 保存到图谱
@@ -211,13 +211,13 @@ const AnalysisPage = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {result.relations.map((rel, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: '#0f172a', 
-                    padding: '16px 18px', 
-                    borderRadius: 10, 
+                    background: '#0f172a',
+                    padding: '16px 18px',
+                    borderRadius: 10,
                     border: '1px solid #334155',
                     transition: 'all 0.3s ease'
                   }}>
@@ -225,14 +225,14 @@ const AnalysisPage = () => {
                       <Text strong style={{ color: '#f1f5f9', fontSize: 15 }}>{rel.subject}</Text>
                       <div style={{ position: 'relative', padding: '0 16px', minWidth: 60 }}>
                         <div style={{ height: 2, width: 50, background: '#475569', borderRadius: 1 }}></div>
-                        <Text style={{ 
-                          position: 'absolute', 
-                          top: -12, 
-                          left: '50%', 
-                          transform: 'translateX(-50%)', 
-                          fontSize: 12, 
-                          color: '#6366f1', 
-                          background: '#0f172a', 
+                        <Text style={{
+                          position: 'absolute',
+                          top: -12,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: 12,
+                          color: '#6366f1',
+                          background: '#0f172a',
                           padding: '2px 8px',
                           borderRadius: 4,
                           fontWeight: 600,
@@ -243,9 +243,9 @@ const AnalysisPage = () => {
                       </div>
                       <Text strong style={{ color: '#f1f5f9', fontSize: 15 }}>{rel.object}</Text>
                     </div>
-                    <Tag 
-                      color="gold" 
-                      style={{ 
+                    <Tag
+                      color="gold"
+                      style={{
                         marginLeft: 16,
                         fontSize: 13,
                         padding: '4px 12px',

@@ -89,9 +89,12 @@ app = create_app()
 
 
 if __name__ == "__main__":
+    # 使用多worker提高并发处理能力，避免慢请求阻塞
     uvicorn.run(
         "main:app",
         host=settings.HOST,
         port=settings.PORT,
-        reload=settings.DEBUG
+        reload=settings.DEBUG,
+        workers=1 if settings.DEBUG else 2,  # 生产环境使用2个worker
+        timeout_keep_alive=30  # 增加keep-alive超时
     )

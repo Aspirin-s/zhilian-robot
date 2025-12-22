@@ -6,7 +6,8 @@ import {
   ExperimentOutlined,
   DatabaseOutlined,
   UserOutlined,
-  RobotOutlined
+  RobotOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 
@@ -20,6 +21,7 @@ const Layout = ({ children }) => {
   const menuItems = [
     { key: '/', icon: <HomeOutlined />, label: '概览' },
     { key: '/graph', icon: <DeploymentUnitOutlined />, label: '图谱探索' },
+    { key: '/temporal', icon: <ThunderboltOutlined />, label: '时序分析' },
     { key: '/analysis', icon: <ExperimentOutlined />, label: '智能分析' },
     { key: '/data', icon: <DatabaseOutlined />, label: '数据中心' },
   ]

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, Input, Button, Select, message, Space, Spin, Empty, Tag, Row, Col } from 'antd'
 import { SearchOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import D3ForceGraph from '../components/D3ForceGraph'
@@ -11,6 +11,25 @@ const GraphPage = () => {
   const [depth, setDepth] = useState(2)
   const [searchText, setSearchText] = useState('')
   const [selectedNode, setSelectedNode] = useState(null)
+
+  // 自动搜索：检测URL参数并执行搜索
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const entityName = urlParams.get('name')
+    const entityId = urlParams.get('entity')
+    
+    if (entityName) {
+      // 设置搜索框文本
+      setSearchText(entityName)
+      // 自动执行搜索
+      setTimeout(() => {
+        handleSearch(entityName)
+      }, 300)
+      
+      // 清除URL参数，避免刷新时重复搜索
+      window.history.replaceState({}, '', '/graph')
+    }
+  }, [])
 
   const handleSearch = async (value) => {
     const term = value || searchText

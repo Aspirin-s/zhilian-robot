@@ -75,6 +75,12 @@ celery_app.conf.beat_schedule = {
         'schedule': crontab(minute=0, hour='*/6'),
         'args': (),
     },
+    # 每天凌晨4点更新所有实体动量
+    'update-entity-momentum-daily': {
+        'task': 'app.tasks.data_tasks.update_all_entity_momentum',
+        'schedule': crontab(hour=4, minute=0),
+        'args': (),
+    },
     # 每周一凌晨3点清理旧数据
     'cleanup-old-data': {
         'task': 'app.tasks.data_tasks.cleanup_old_crawl_data',

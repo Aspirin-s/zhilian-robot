@@ -26,6 +26,17 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Celery
+celerybeat-schedule
+celerybeat-schedule.db
+celerybeat.pid
+
+# Cache
+.cache/
+*.cache
+.mypy_cache/
+.ruff_cache/
+
 # Virtual Environment
 .venv
 venv/
@@ -54,10 +65,12 @@ logs/
 *.sqlite
 
 # Environment variables
-.env
+# 注意：为了让用户下载后无需配置即可运行，.env 和 backend/.env 文件已包含真实密钥并提交到仓库
+# 生产环境部署时请务必修改所有密钥！
 .env.local
 .env.*.local
-backend/.env
+!.env
+!backend/.env
 !backend/.env.example
 
 # Node
@@ -127,7 +140,6 @@ celerybeat.pid
 celerybeat-schedule.db
 
 # Docker
-.dockerignore
 docker-compose.override.yml
 
 # Cache directories

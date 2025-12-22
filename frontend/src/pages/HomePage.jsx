@@ -5,7 +5,8 @@ import {
   ThunderboltOutlined,
   DatabaseOutlined,
   ArrowRightOutlined,
-  RiseOutlined
+  RiseOutlined,
+  FireOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { graphService, dataService } from '../services/api'
@@ -21,12 +22,32 @@ const HomePage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // 尝试从sessionStorage获取缓存数据
+        const cachedGraphStats = sessionStorage.getItem('graphStats')
+        const cachedDataStats = sessionStorage.getItem('dataStats')
+        const cacheTime = sessionStorage.getItem('statsTimestamp')
+        
+        // 如果缓存存在且未过期（3分钟内）
+        const now = Date.now()
+        if (cachedGraphStats && cachedDataStats && cacheTime && (now - parseInt(cacheTime)) < 180000) {
+          setGraphStats(JSON.parse(cachedGraphStats))
+          setDataStats(JSON.parse(cachedDataStats))
+          setLoading(false)
+          return
+        }
+        
+        // 缓存不存在或已过期，从服务器获取
         const [gStats, dStats] = await Promise.all([
           graphService.getStatistics(),
           dataService.getDataStatistics()
         ])
         setGraphStats(gStats)
         setDataStats(dStats)
+        
+        // 存入sessionStorage
+        sessionStorage.setItem('graphStats', JSON.stringify(gStats))
+        sessionStorage.setItem('dataStats', JSON.stringify(dStats))
+        sessionStorage.setItem('statsTimestamp', now.toString())
       } catch (error) {
         console.error('Failed to load stats', error)
       } finally {
@@ -252,7 +273,7 @@ const HomePage = () => {
 
       {/* 功能导航区域 */}
       <Row gutter={[24, 24]}>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={12} lg={6}>
           <FeatureCard 
             title="图谱探索" 
             desc="可视化查询企业上下游关系，支持多层级穿透分析，发现潜在商业机会。"
@@ -261,7 +282,16 @@ const HomePage = () => {
             color="#6366f1"
           />
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={12} lg={6}>
+          <FeatureCard 
+            title="时序分析" 
+            desc="追踪实体动量变化趋势，识别热点话题，监控特别关注对象的时间演化。"
+            icon={<FireOutlined />}
+            link="/temporal"
+            color="#ef4444"
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
           <FeatureCard 
             title="智能分析" 
             desc="上传行业报告或新闻，利用 LLM 自动提取实体与关系，一键存入知识库。"
@@ -270,7 +300,7 @@ const HomePage = () => {
             color="#a855f7"
           />
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} sm={12} lg={6}>
           <FeatureCard 
             title="数据中心" 
             desc="管理 RSS 订阅源与爬虫任务，监控数据采集状态，进行数据清洗与维护。"

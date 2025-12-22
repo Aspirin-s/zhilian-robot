@@ -2,7 +2,7 @@
 业务服务 - 图谱构建服务
 """
 from app.database.neo4j_db import neo4j_conn
-from app.nlp import ner_processor, re_processor, llm_processor
+from app.nlp import llm_processor
 from typing import List, Dict
 import logging
 
@@ -29,8 +29,11 @@ class GraphService:
         try:
             logger.info(f"开始保存数据到图谱: {sum(len(v) for v in entities.values())} 个实体, {len(relations)} 个关系")
             
-            # 直接保存
+            # 1. 保存到 Neo4j
             self._save_to_graph(entities, relations)
+            
+            # 2. 保存到 MongoDB canonical_entities (用于动量计算)
+            self._save_to_mongodb(entities)
             
             return {
                 "success": True,
@@ -41,34 +44,22 @@ class GraphService:
             logger.error(f"保存到图谱失败: {str(e)}", exc_info=True)
             return {"success": False, "error": str(e)}
     
-    def build_graph_from_text(self, text: str, use_llm: bool = False) -> Dict:
+    def build_graph_from_text(self, text: str, use_llm: bool = True) -> Dict:
         """
-        从文本构建图谱
+        从文本构建图谱（使用DeepSeek LLM）
         
         Args:
             text: 输入文本
-            use_llm: 是否使用大语言模型
+            use_llm: 保留参数以兼容旧接口（现在始终使用LLM）
             
         Returns:
             构建结果
         """
         try:
-            if use_llm:
-                # 使用大模型分析
-                result = llm_processor.analyze_industry_chain(text)
-                entities = result['entities']
-                relations = result['relations']
-            else:
-                # 使用传统NLP方法
-                entities = ner_processor.extract_industry_entities(text)
-                
-                # 转换实体格式用于关系提取
-                entity_list = []
-                for category, items in entities.items():
-                    for item in items:
-                        entity_list.append({"text": item, "label": category})
-                
-                relations = re_processor.extract_relations(text, entity_list)
+            # 使用DeepSeek LLM分析
+            result = llm_processor.analyze_industry_chain(text)
+            entities = result['entities']
+            relations = result['relations']
             
             # 存入图数据库
             self._save_to_graph(entities, relations)
@@ -121,6 +112,33 @@ class GraphService:
             "type": entity_type,
             "confidence": confidence
         })
+    
+    def _save_to_mongodb(self, entities: Dict):
+        """
+        保存实体到 MongoDB canonical_entities 集合
+        用于动量计算和实体管理
+        
+        注意：每次保存文档引用的实体时，都会增加引用计数
+        """
+        from app.database.mongodb import canonical_entity_manager
+        
+        for category, items in entities.items():
+            # Use lowercase category to match MongoDB entity IDs
+            # This ensures consistency with document_instances
+            for item_name in items:
+                # 生成实体ID (使用小写category)
+                entity_id = f"CANONICAL_{category}_{item_name}"
+                
+                # 创建或更新实体
+                canonical_entity_manager.create_or_update_entity(
+                    entity_id=entity_id,
+                    entity_type=category,
+                    names=[item_name],
+                    momentum=0.0  # 初始动量为0，需要后续计算
+                )
+                
+                # 增加引用计数（每次处理文档都计数一次）
+                canonical_entity_manager.increment_reference_count(entity_id)
     
     def _merge_relation(self, relation: Dict):
         """
@@ -197,7 +215,9 @@ class GraphService:
             return {"nodes": [], "edges": []}
     
     def _format_graph_data(self, raw_data: List) -> Dict:
-        """格式化图谱数据"""
+        """格式化图谱数据（包含动量信息）"""
+        from app.database.mongodb import mongodb_conn
+        
         nodes = []
         edges = []
         node_set = set()
@@ -209,10 +229,30 @@ class GraphService:
                     node_data = record[key]
                     node_id = node_data.get('name')
                     if node_id and node_id not in node_set:
+                        node_type = node_data.get('type', 'unknown')
+                        
+                        # 从MongoDB获取动量信息
+                        entity_id = f"CANONICAL_{node_type}_{node_id}"
+                        canonical_entity = mongodb_conn.find_one('canonical_entities', {'_id': entity_id})
+                        
+                        # 调试日志
+                        logger.info(f"查询节点: {node_id}, 类型: {node_type}, 实体ID: {entity_id}, 找到: {canonical_entity is not None}")
+                        if canonical_entity:
+                            logger.info(f"  动量值: {canonical_entity.get('current_momentum')}, 引用: {canonical_entity.get('reference_count')}")
+                        
+                        # 提取动量值和引用次数
+                        current_momentum = 0.0
+                        reference_count = 0
+                        if canonical_entity:
+                            current_momentum = canonical_entity.get('current_momentum', 0.0)
+                            reference_count = canonical_entity.get('reference_count', 0)
+                        
                         nodes.append({
                             "id": node_id,
                             "name": node_id,
-                            "type": node_data.get('type', 'unknown')
+                            "type": node_type,
+                            "current_momentum": current_momentum,
+                            "reference_count": reference_count
                         })
                         node_set.add(node_id)
             
@@ -239,6 +279,50 @@ class GraphService:
         
         logger.info(f"格式化结果: {len(nodes)} 个节点, {len(edges)} 条边")
         return {"nodes": nodes, "edges": edges}
+    
+    def get_entity_neighbors(self, entity_id: str, depth: int = 1) -> List[Dict]:
+        """
+        获取实体的关联关系
+        
+        Args:
+            entity_id: 实体ID（在Neo4j中对应name属性）
+            depth: 关系深度（1表示直接关联，2表示二度关联等）
+            
+        Returns:
+            关联关系列表
+        """
+        try:
+            # 查询指定深度的关联关系
+            query = f"""
+            MATCH path = (e:Entity {{name: $entity_id}})-[*1..{depth}]-(related:Entity)
+            WITH relationships(path) as rels, related
+            UNWIND rels as r
+            RETURN DISTINCT 
+                startNode(r).name as source,
+                type(r) as relation,
+                endNode(r).name as target,
+                r.confidence as confidence,
+                r.label as label
+            LIMIT 100
+            """
+            
+            results = self.neo4j.execute_query(query, {"entity_id": entity_id})
+            
+            relations = []
+            for record in results:
+                relations.append({
+                    "source": record.get('source'),
+                    "target": record.get('target'),
+                    "relation": record.get('label') or record.get('relation'),
+                    "confidence": record.get('confidence', 0.9)
+                })
+            
+            logger.info(f"获取实体 {entity_id} 的关联关系: {len(relations)} 条")
+            return relations
+            
+        except Exception as e:
+            logger.error(f"获取实体关联关系失败: {e}", exc_info=True)
+            return []
     
     def get_graph_statistics(self) -> Dict:
         """获取图谱统计信息"""

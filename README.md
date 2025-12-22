@@ -12,7 +12,9 @@
 ### 🎯 核心特性
 
 - ✅ **深色主题 UI**：现代化深色界面设计，专业数据可视化体验
-- ✅ **D3.js 力导向图**：替代 ECharts，支持节点拖拽、缩放、全屏展示
+- ✅ **D3.js 力导向图**：支持节点拖拽、缩放、全屏展示，集成动量热度可视化
+- ✅ **动量热度系统**：实时计算实体热度，节点颜色渐变（蓝→绿→橙→红）+ 光环脉动 + 粒子流动
+- ✅ **情报溯源机制**：可追溯每个实体的数据来源，展示引用次数和相关证据链
 - ✅ **统计仪表盘**：Recharts 驱动的饼图/柱状图实时统计
 - ✅ **DeepSeek LLM**：智能实体识别和关系抽取
 - ✅ **自动化采集**：RSS 订阅 + 定时爬虫 + Celery 任务调度
@@ -28,7 +30,8 @@
 - **Docker Desktop** 4.0+ (Windows/Mac) 或 **Docker Engine** 20.10+ (Linux)
 - **Docker Compose** 2.0+
 - **Git**
-- **DeepSeek API 密钥**（[免费注册](https://platform.deepseek.com/)）
+
+> **🔐 安全提示**：本项目内置了演示用的 API 密钥，可直接运行。生产环境部署时请务必修改所有密钥，详见 [SECURITY.md](SECURITY.md)
 
 ### 部署步骤
 
@@ -39,31 +42,12 @@ git clone https://github.com/Aspirin-s/zhilian-robot.git
 cd zhilian-robot
 ```
 
-#### 2️⃣ 配置 DeepSeek API
+#### 2️⃣ 启动所有服务
+
+> **⚠️ 注意**：项目已内置 DeepSeek API 密钥（演示用），可直接启动使用！  
+> 如需使用您自己的密钥，请编辑 `backend/.env` 文件修改 `OPENAI_API_KEY` 参数。
 
 ```bash
-# 复制环境变量模板
-cd backend
-cp .env.example .env
-
-# 编辑 .env 文件（Windows 用 notepad，Linux/Mac 用 vim/nano）
-notepad .env
-```
-
-**必填配置**：
-```env
-# DeepSeek API 配置
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
-```
-
-#### 3️⃣ 启动所有服务
-
-```bash
-# 返回项目根目录
-cd ..
-
 # 一键启动 9 个容器（首次构建需 5-10 分钟）
 docker-compose up -d
 
@@ -71,7 +55,7 @@ docker-compose up -d
 docker-compose ps
 ```
 
-#### 4️⃣ 访问应用
+#### 3️⃣ 访问应用
 
 | 服务 | 地址 | 说明 |
 |-----|------|-----|
@@ -93,9 +77,15 @@ docker-compose ps
 ### 2. 🕸️ 图谱探索
 
 - **D3.js 力导向图**：节点拖拽、画布缩放（0.1x-4x）、全屏模式
+- **动量热度可视化**：
+  - 节点颜色渐变：动量0-100%对应蓝→绿→橙→红
+  - 高动量节点（>60%）：红色虚线光环脉动效果
+  - 中高动量节点（40-60%）：节点缩放脉动
+  - 粒子流动：连接线上粒子从低动量流向高动量节点
+  - 连接线渐变：基于两端节点动量的颜色渐变
 - **搜索控制面板**：企业名称搜索 + 层级选择器（1-4 层关系）
 - **统计仪表盘**：饼图（实体类型分布）+ 柱状图（Top 6 连接数节点）
-- **实体详情面板**：查看节点信息和关联关系，自动去重
+- **实体详情面板**：查看节点信息、关联关系、动量值和引用次数
 
 ### 3. 🤖 智能分析
 
@@ -104,12 +94,21 @@ docker-compose ps
 - **结果可视化**：按类型分组的实体 Tags，箭头可视化的关系链
 - **保存到图谱**：一键将分析结果存储到 Neo4j
 
-### 4. 💾 数据中心
+### 4. 📊 动态分析（时间轴）
+
+- **动量排行榜**：实时显示TOP实体动量热度，支持按类型筛选
+- **时间轴可视化**：Recharts折线图展示实体动量历史趋势
+- **情报溯源**：点击实体可查看所有相关文档、来源和引用证据
+- **特别关注**：将高动量实体加入监控面板，自动提醒波动
+- **数据透明性**：每个实体显示引用次数，确保数据可信度
+
+### 5. 💾 数据中心
 
 - **统计卡片**：总文章数、今日采集、数据源数、失败任务
 - **RSS 订阅源管理**：批量更新、查看详情、删除失效源
 - **文章列表管理**：搜索、分页、批量删除、单篇 NLP 分析
 - **任务历史记录**：Celery 任务状态监控（成功/失败/运行中）
+- **来源可信度**：每条数据记录来源标签（百度资讯/OFweek等）和原文链接
 
 ---
 
@@ -156,11 +155,17 @@ zhilian-robot/
 ├── backend/                      # 后端服务
 │   ├── app/
 │   │   ├── api/                 # FastAPI 路由
+│   │   ├── analytics/           # 动量计算与异常检测
 │   │   ├── nlp/                 # NLP 处理（DeepSeek LLM）
-│   │   ├── services/            # 业务逻辑（Neo4j 图谱服务）
-│   │   ├── crawler/             # 数据采集（RSS + 爬虫）
+│   │   ├── services/            # 业务逻辑（Neo4j 图谱服务、实体规范化）
+│   │   ├── crawler/             # 数据采集（RSS + 新闻爬虫）
 │   │   ├── tasks/               # Celery 异步任务
-│   │   └── database/            # 数据库连接
+│   │   ├── database/            # 数据库连接（Neo4j/MongoDB/Redis）
+│   │   └── models/              # Pydantic 数据模型
+│   ├── scripts/                 # 后台维护脚本
+│   │   ├── init_sources.py     # 初始化数据源可信度
+│   │   ├── backfill_momentum_history.py  # 回填历史动量数据
+│   │   └── check_code_integrity.py       # 代码完整性检查
 │   ├── config/                  # 配置文件
 │   ├── wait_for_db.py          # 数据库启动等待脚本
 │   ├── requirements.txt         # Python 依赖
@@ -168,8 +173,17 @@ zhilian-robot/
 │
 ├── frontend/                     # 前端服务
 │   ├── src/
-│   │   ├── pages/               # 页面组件（深色主题）
-│   │   ├── components/          # 组件库（D3ForceGraph, DashboardStats）
+│   │   ├── pages/               # 页面组件
+│   │   │   ├── HomePage.jsx            # 首页概览
+│   │   │   ├── GraphPage.jsx           # 图谱探索（含动量可视化）
+│   │   │   ├── AnalysisPage.jsx        # 智能分析
+│   │   │   ├── TemporalAnalysisPage.jsx # 动态分析（时间轴+情报溯源）
+│   │   │   └── DataManagePage.jsx      # 数据中心
+│   │   ├── components/          # 组件库
+│   │   │   ├── D3ForceGraph.jsx        # D3力导向图（含粒子效果）
+│   │   │   ├── DashboardStats.jsx      # 统计卡片
+│   │   │   ├── TimelineView.jsx        # 时间轴组件
+│   │   │   └── Layout.jsx              # 布局框架
 │   │   ├── services/            # API 服务
 │   │   └── index.css            # 全局样式（深色主题）
 │   ├── package.json             # npm 依赖
@@ -178,12 +192,12 @@ zhilian-robot/
 │   └── nginx.conf               # Nginx 配置
 │
 ├── docs/                         # 文档目录
-│   ├── 快速开始.md              # 新手部署指南
-│   ├── DeepSeek配置说明.md      # API 密钥配置
-│   ├── 前端UI升级说明.md        # UI 升级记录
-│   └── 自动化数据采集指南.md    # 爬虫和 RSS 配置
+│   ├── QUICKSTART.md            # 快速开始指南
+│   └── DEPLOYMENT_CHECKLIST.md # 部署检查清单
 │
 ├── docker-compose.yml           # 容器编排配置
+├── .env.example                 # 环境变量模板
+├── .gitignore                   # Git 忽略规则
 └── README.md                    # 本文件
 ```
 
@@ -267,9 +281,12 @@ docker-compose restart backend
 
 | 模块 | 完成度 | 说明 |
 |-----|--------|-----|
-| 数据采集 | 70% | ✅ RSS + 新闻爬虫 ⚠️ 缺少报告解析 |
+| 数据采集 | 85% | ✅ RSS + 新闻爬虫 ✅ 来源标记 ⚠️ 缺少PDF报告解析 |
 | NLP 分析 | 95% | ✅ DeepSeek LLM ✅ 实体/关系抽取 |
-| 知识图谱 | 85% | ✅ Neo4j 存储 ✅ Cypher 查询 |
+| 知识图谱 | 90% | ✅ Neo4j 存储 ✅ Cypher 查询 ✅ 实体规范化 |
+| 动量系统 | 95% | ✅ 实时计算 ✅ 历史趋势 ✅ 异常检测 |
+| 可视化 | 98% | ✅ D3力导向图 ✅ 动量热度 ✅ 粒子效果 ✅ 时间轴 |
+| 情报溯源 | 90% | ✅ 引用统计 ✅ 证据链路 ✅ 来源可信度 |
 | 前端界面 | 95% | ✅ D3.js ✅ 深色主题 ✅ 响应式 |
 | 任务调度 | 90% | ✅ Celery ✅ 定时任务 ✅ Flower |
 | 容器化 | 100% | ✅ Docker Compose ✅ 生产就绪 |

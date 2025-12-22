@@ -3,7 +3,7 @@ API路由 - 文本分析接口
 """
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import TextAnalysisRequest, TextAnalysisResponse
-from app.nlp import ner_processor, re_processor, llm_processor
+from app.nlp import llm_processor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,34 +13,10 @@ router = APIRouter(prefix="/nlp", tags=["NLP"])
 @router.post("/analyze", response_model=TextAnalysisResponse)
 async def analyze_text(request: TextAnalysisRequest):
     """
-    分析文本,提取实体和关系
+    使用DeepSeek LLM分析文本,提取实体和关系
     """
     try:
-        result = {
-            "entities": {},
-            "relations": [],
-            "summary": ""
-        }
-        
-        if request.extract_entities:
-            # 提取实体
-            result["entities"] = ner_processor.extract_industry_entities(request.text)
-        
-        if request.extract_relations and request.extract_entities:
-            # 提取关系
-            entity_list = []
-            for category, items in result["entities"].items():
-                for item in items:
-                    entity_list.append({"text": item, "label": category})
-            
-            relations = re_processor.extract_relations(request.text, entity_list)
-            result["relations"] = relations
-        
-        # 生成摘要
-        entity_count = sum(len(v) for v in result["entities"].values())
-        relation_count = len(result["relations"])
-        result["summary"] = f"识别到{entity_count}个实体,{relation_count}个关系"
-        
+        result = llm_processor.analyze_industry_chain(request.text)
         return result
     except Exception as e:
         logger.error(f"文本分析失败: {str(e)}")
@@ -50,7 +26,7 @@ async def analyze_text(request: TextAnalysisRequest):
 @router.post("/analyze-llm", response_model=TextAnalysisResponse)
 async def analyze_text_with_llm(request: TextAnalysisRequest):
     """
-    使用大语言模型分析文本
+    使用DeepSeek LLM分析文本（兼容旧接口）
     """
     try:
         result = llm_processor.analyze_industry_chain(request.text)

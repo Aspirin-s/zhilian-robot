@@ -16,13 +16,8 @@ redis==4.6.0
 pymysql==1.1.0
 sqlalchemy==2.0.23
 
-# NLP and AI (Core - 仅 DeepSeek LLM)
-openai==1.57.0  # 升级到最新稳定版
-
-# NLP and AI (Optional - 本地 NER/RE 模型,如不使用可注释)
-# transformers==4.45.0
-# torch==2.5.1
-# tokenizers==0.20.3
+# NLP and AI (使用DeepSeek LLM)
+openai==1.57.0
 
 # Web Scraping
 scrapy==2.11.0
@@ -40,6 +35,10 @@ flower==2.0.1
 pandas==2.1.3
 numpy==1.26.2
 openpyxl==3.1.2
+
+# 科学计算和时间序列分析
+scipy==1.11.4
+statsmodels==0.14.0
 
 # Utilities
 python-dotenv==1.0.0
